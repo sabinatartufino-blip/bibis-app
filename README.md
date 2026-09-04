@@ -160,12 +160,17 @@ month in Excel.
 
 ## Sending your ingredients to someone else
 
-**Settings › Share your ingredients › Export ingredients** writes a JSON file holding the
-ingredient list and nothing else: names, brands, barcodes, basis, and every nutrition
-value you have entered, including the vitamins and minerals. It carries **no** log, no
-weights, no body profile, no targets, no shopping list and no API keys, so it is safe to
-send in a message. You are asked whether to include the label photos — without them the
-file is a few KB; with them it can run to megabytes.
+**Settings › Share your ingredients › Share list** opens the phone's own share sheet with
+the list attached — pick WhatsApp, or anything else on it. Nothing is downloaded and there
+is no file to go looking for.
+
+The list holds the ingredients and nothing else: names, brands, barcodes, basis, and every
+nutrition value entered, including vitamins and minerals. It carries **no** log, no weights,
+no body profile, no targets, no shopping list and no API keys, so it is safe to send.
+
+Two fallbacks sit under it. **Save as file** downloads it to attach by hand (and asks
+whether to include the label photos — without them a few KB, with them megabytes).
+**Copy as text** puts it on the clipboard to send as an ordinary message.
 
 Saved meals are deliberately left out. A meal is a list of ingredient ids that exist only
 on the phone that made it, so it would arrive pointing at nothing.

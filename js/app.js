@@ -2,7 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '2.11.0';
+const APP_VERSION = '2.12.0';
 
 const S = {
   view: 'today',
@@ -1934,7 +1934,50 @@ function bindSettings() {
     busy(false);
   });
 
-  /* ---------- share the ingredient list ---------- */
+  /* ---------- share the ingredient list ----------
+     The share sheet is the point: no download, no hunting through Downloads,
+     no attaching by hand. Photos are never included on this path — the file
+     has to stay small enough for a chat app to carry, and the base64 of a few
+     label shots runs to megabytes. */
+  $('d-ing-share').addEventListener('click', async () => {
+    if (!S.ings.size) { toast('Your library is empty — nothing to send'); return; }
+    if (!navigator.share) {
+      toast('This browser has no share sheet — use Save as file or Copy as text', 5000);
+      return;
+    }
+
+    let json;
+    try {
+      /* Kept as short as possible: the share sheet needs the tap that opened
+         it to still count as a user gesture, and a long await can spend it. */
+      json = JSON.stringify(await DB.exportIngredients(false));
+    } catch (e) { toast(e.message, 4500); return; }
+
+    const file = new File([json], 'bibis-app-ingredients-' + Calc.today() + '.txt',
+      { type: 'text/plain' });
+    const kb = Math.max(1, Math.round(json.length / 1024));
+
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        /* Files only, no `text`. Some share targets quietly drop the
+           attachment when both are present, and the file is the payload. */
+        await navigator.share({ files: [file], title: 'Bibi’s App ingredients' });
+        $('d-ing-status').textContent = 'Shared ' + S.ings.size + ' ingredients (' + kb +
+          ' KB). They add it with Import ingredients.';
+      } else {
+        /* No file sharing on this device, but the text still travels. */
+        await navigator.share({ title: 'Bibi’s App ingredients', text: json });
+        $('d-ing-status').textContent = 'Shared ' + S.ings.size +
+          ' ingredients as text. They add it with Paste a list.';
+      }
+    } catch (e) {
+      /* Dismissing the sheet throws AbortError. That is a choice, not a
+         failure, and must not be reported as one. */
+      if (e && e.name === 'AbortError') return;
+      toast('Could not open the share sheet — use Save as file instead', 5000);
+    }
+  });
+
   $('d-ing-export').addEventListener('click', async () => {
     const n = S.ings.size;
     if (!n) { toast('Your library is empty — nothing to send'); return; }

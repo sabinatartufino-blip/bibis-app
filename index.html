@@ -306,23 +306,29 @@
           nutrition values. No log, no weights, no targets, no profile, no keys. Saved meals are
           left out because they point at ingredients on this phone.</p>
         <div class="btn-row">
-          <button class="btn" id="d-ing-export">Export ingredients</button>
+          <button class="btn primary" id="d-ing-share">Share list</button>
           <button class="btn" id="d-ing-import">Import ingredients</button>
-          <!-- Deliberately wide: the file is saved as .txt so WhatsApp will carry
-               it (it refuses application/json), and a recipient's phone may hand
+          <!-- Deliberately wide: the file is a .txt so WhatsApp will carry it
+               (it refuses application/json), and a recipient's phone may hand
                it over as text/plain, application/json or nothing at all. -->
           <input type="file" id="d-ing-file" accept=".txt,.json,text/plain,application/json" hidden>
         </div>
+        <p class="block-body"><b>Share list</b> opens your phone's share sheet — pick WhatsApp,
+          or anything else there. The other person taps <b>Import ingredients</b> and picks the
+          file they were sent.</p>
         <p class="block-body">Importing <b>adds</b> to your library and never removes or changes
           what is already there. Anything you already have under the same name and brand is
-          skipped, so the same file can be imported twice with no duplicates.</p>
+          skipped, so the same list can be imported twice with no duplicates.</p>
         <div class="derived" id="d-ing-status"></div>
 
-        <p class="block-body" style="margin-top:12px">Messaging apps are fussy about files. If one
-          will not carry it, send the list as <b>text</b> instead — copy it, paste it into the chat,
-          and the other person pastes it below.</p>
+        <p class="block-body" style="margin-top:12px">If an app refuses the file:
+          <b>Save as file</b> to attach it by hand, or <b>Copy as text</b> to send it as an
+          ordinary message the other person pastes in.</p>
         <div class="btn-row">
+          <button class="btn" id="d-ing-export">Save as file</button>
           <button class="btn" id="d-ing-copy">Copy as text</button>
+        </div>
+        <div class="btn-row">
           <button class="btn" id="d-ing-paste">Paste a list</button>
         </div>
         <div id="d-ing-paste-wrap" hidden>
