@@ -160,17 +160,24 @@ month in Excel.
 
 ## Sending your ingredients to someone else
 
-**Settings › Share your ingredients › Share list** opens the phone's own share sheet with
-the list attached — pick WhatsApp, or anything else on it. Nothing is downloaded and there
-is no file to go looking for.
+**Settings › Share your ingredients › Send via WhatsApp** attaches the list as a file and
+opens the phone's share sheet, where WhatsApp is one tap away.
+
+It always sends a **file**, never text pasted into a message body. No link format can hand
+a file to a named app — `wa.me` and `whatsapp://` carry text only — so the route is
+`navigator.share()` with the file attached, and Android's share sheet is where the app gets
+chosen. That sheet cannot be skipped; it is the same one every native app uses. The button
+carries a plain speech-bubble glyph of our own in WhatsApp's green, not WhatsApp's own
+trademarked mark.
 
 The list holds the ingredients and nothing else: names, brands, barcodes, basis, and every
 nutrition value entered, including vitamins and minerals. It carries **no** log, no weights,
 no body profile, no targets, no shopping list and no API keys, so it is safe to send.
 
-Two fallbacks sit under it. **Save as file** downloads it to attach by hand (and asks
-whether to include the label photos — without them a few KB, with them megabytes).
-**Copy as text** puts it on the clipboard to send as an ordinary message.
+**Save as file** downloads it to attach by hand, and asks whether to include the label
+photos — without them a few KB, with them megabytes. On a browser that cannot attach a file
+to a share sheet (a desktop, usually), the WhatsApp button falls back to this download
+rather than quietly sending text the other end could not import.
 
 Saved meals are deliberately left out. A meal is a list of ingredient ids that exist only
 on the phone that made it, so it would arrive pointing at nothing.

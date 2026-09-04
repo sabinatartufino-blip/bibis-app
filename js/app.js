@@ -2,7 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '2.12.0';
+const APP_VERSION = '2.13.0';
 
 const S = {
   view: 'today',
@@ -1934,17 +1934,17 @@ function bindSettings() {
     busy(false);
   });
 
-  /* ---------- share the ingredient list ----------
-     The share sheet is the point: no download, no hunting through Downloads,
-     no attaching by hand. Photos are never included on this path — the file
-     has to stay small enough for a chat app to carry, and the base64 of a few
-     label shots runs to megabytes. */
-  $('d-ing-share').addEventListener('click', async () => {
+  /* ---------- send the list to WhatsApp ----------
+     Always a FILE, never text in a message body. No link format can hand a
+     file to a named app — wa.me and whatsapp:// carry text only — so the
+     route is navigator.share with the file attached, and Android's share
+     sheet is where WhatsApp gets picked. That sheet is unavoidable; it is
+     also the same one every native app uses.
+
+     Photos are never included: the file has to stay small enough for a chat
+     app to carry, and the base64 of a few label shots runs to megabytes. */
+  $('d-ing-wa').addEventListener('click', async () => {
     if (!S.ings.size) { toast('Your library is empty — nothing to send'); return; }
-    if (!navigator.share) {
-      toast('This browser has no share sheet — use Save as file or Copy as text', 5000);
-      return;
-    }
 
     let json;
     try {
@@ -1957,19 +1957,23 @@ function bindSettings() {
       { type: 'text/plain' });
     const kb = Math.max(1, Math.round(json.length / 1024));
 
+    /* No file sharing here — a desktop browser, usually. Fall back to the
+       download rather than quietly sending text instead of a file, which is
+       not what was asked for and the other end cannot import. */
+    if (!navigator.share || !navigator.canShare || !navigator.canShare({ files: [file] })) {
+      download(json, file.name, 'text/plain');
+      $('d-ing-status').textContent = 'This browser cannot attach a file to a share sheet, ' +
+        'so the list was saved to your Downloads instead — attach it to a message by hand.';
+      toast('Saved to Downloads — attach it by hand', 4500);
+      return;
+    }
+
     try {
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        /* Files only, no `text`. Some share targets quietly drop the
-           attachment when both are present, and the file is the payload. */
-        await navigator.share({ files: [file], title: 'Bibi’s App ingredients' });
-        $('d-ing-status').textContent = 'Shared ' + S.ings.size + ' ingredients (' + kb +
-          ' KB). They add it with Import ingredients.';
-      } else {
-        /* No file sharing on this device, but the text still travels. */
-        await navigator.share({ title: 'Bibi’s App ingredients', text: json });
-        $('d-ing-status').textContent = 'Shared ' + S.ings.size +
-          ' ingredients as text. They add it with Paste a list.';
-      }
+      /* Files only, no `text`. Some share targets quietly drop the attachment
+         when both are present, and the file is the payload. */
+      await navigator.share({ files: [file], title: 'Bibi’s App ingredients' });
+      $('d-ing-status').textContent = 'Sent ' + S.ings.size + ' ingredients as a file (' + kb +
+        ' KB). They add it with Import ingredients.';
     } catch (e) {
       /* Dismissing the sheet throws AbortError. That is a choice, not a
          failure, and must not be reported as one. */
@@ -2012,42 +2016,6 @@ function bindSettings() {
     await addSharedList(text);
   });
 
-  /* Text is the fallback that always works. A messaging app that refuses a
-     file attachment will still carry a few KB of characters in the message
-     body, and pasting sidesteps the download-then-find-it dance on a phone. */
-  $('d-ing-copy').addEventListener('click', async () => {
-    if (!S.ings.size) { toast('Your library is empty — nothing to send'); return; }
-    busy(true, 'Preparing the text…');
-    try {
-      /* Never photos here: base64 images would run to megabytes of characters
-         and no chat app would carry it. */
-      const json = JSON.stringify(await DB.exportIngredients(false));
-      busy(false);
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(json);
-        $('d-ing-status').textContent = 'Copied ' + S.ings.size + ' ingredients as text (' +
-          Math.max(1, Math.round(json.length / 1024)) + ' KB) — paste it into a message.';
-        toast('Copied — paste it into a chat', 3600);
-      } else {
-        toast('Could not reach the clipboard — use Export ingredients instead', 4500);
-      }
-    } catch (e) { busy(false); toast(e.message, 4500); }
-  });
-
-  $('d-ing-paste').addEventListener('click', () => {
-    $('d-ing-paste-wrap').hidden = false;
-    $('d-ing-text').value = '';
-    $('d-ing-text').focus();
-  });
-  $('d-ing-text-cancel').addEventListener('click', () => {
-    $('d-ing-paste-wrap').hidden = true;
-    $('d-ing-text').value = '';
-  });
-  $('d-ing-text-go').addEventListener('click', async () => {
-    const ok = await addSharedList($('d-ing-text').value);
-    if (ok) { $('d-ing-paste-wrap').hidden = true; $('d-ing-text').value = ''; }
-  });
-
   $('d-csv').addEventListener('click', async () => {
     const all = await DB.all('entries');
     all.sort((a, b) => (a.date + a.slot).localeCompare(b.date + b.slot));
@@ -2077,20 +2045,19 @@ function bindSettings() {
   });
 }
 
-/* One path for both routes into the library — a file and a paste differ only
-   in where the characters came from. Returns true if anything was added, so
-   the paste box knows whether to close itself. */
+/* Takes the contents of a shared list file and merges it in. Returns whether
+   anything was added. */
 async function addSharedList(raw) {
   const text = String(raw || '').trim();
-  if (!text) { toast('Nothing to read — paste the text first', 4000); return false; }
+  if (!text) { toast('That file is empty', 4000); return false; }
 
   let data;
   try {
     data = JSON.parse(text);
   } catch (e) {
-    /* The usual cause is a half-copied message, so say that rather than
-       showing them a parser error about an unexpected token. */
-    toast('That text is incomplete or not a list from this app — copy the whole message and try again', 5500);
+    /* Usually a truncated download or the wrong file entirely, so say that
+       rather than showing a parser error about an unexpected token. */
+    toast('That file is damaged or not a list from this app — ask for it again', 5500);
     return false;
   }
 

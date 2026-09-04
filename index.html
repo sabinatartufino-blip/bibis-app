@@ -305,41 +305,34 @@
         <p class="block-body">Sends the <b>ingredient list only</b> — names, brands, barcodes and
           nutrition values. No log, no weights, no targets, no profile, no keys. Saved meals are
           left out because they point at ingredients on this phone.</p>
+        <!-- A generic chat glyph, not WhatsApp's own mark, which is their
+             trademark and not ours to redraw. The word on the button says
+             where it goes. -->
+        <button class="btn wa-btn" id="d-ing-wa">
+          <svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 3.2c-4.7 0-8.5 3.5-8.5 7.9 0 1.7.6 3.3 1.6 4.6l-1 3.5 3.7-1a9.3 9.3 0 0 0 4.2 1c4.7 0 8.5-3.5 8.5-7.9S16.7 3.2 12 3.2z"
+                  fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+          </svg>
+          Send via WhatsApp
+        </button>
+        <p class="block-body" style="margin-top:8px">Attaches the list as a file and opens your
+          phone's share sheet — tap WhatsApp there, then pick the person. Android always shows
+          that sheet; no app can be handed a file without it.</p>
+
         <div class="btn-row">
-          <button class="btn primary" id="d-ing-share">Share list</button>
+          <button class="btn" id="d-ing-export">Save as file</button>
           <button class="btn" id="d-ing-import">Import ingredients</button>
           <!-- Deliberately wide: the file is a .txt so WhatsApp will carry it
                (it refuses application/json), and a recipient's phone may hand
                it over as text/plain, application/json or nothing at all. -->
           <input type="file" id="d-ing-file" accept=".txt,.json,text/plain,application/json" hidden>
         </div>
-        <p class="block-body"><b>Share list</b> opens your phone's share sheet — pick WhatsApp,
-          or anything else there. The other person taps <b>Import ingredients</b> and picks the
-          file they were sent.</p>
+        <p class="block-body"><b>Save as file</b> puts it in Downloads to attach by hand.
+          The other person taps <b>Import ingredients</b> and picks the file they were sent.</p>
         <p class="block-body">Importing <b>adds</b> to your library and never removes or changes
           what is already there. Anything you already have under the same name and brand is
-          skipped, so the same list can be imported twice with no duplicates.</p>
+          skipped, so the same file can be imported twice with no duplicates.</p>
         <div class="derived" id="d-ing-status"></div>
-
-        <p class="block-body" style="margin-top:12px">If an app refuses the file:
-          <b>Save as file</b> to attach it by hand, or <b>Copy as text</b> to send it as an
-          ordinary message the other person pastes in.</p>
-        <div class="btn-row">
-          <button class="btn" id="d-ing-export">Save as file</button>
-          <button class="btn" id="d-ing-copy">Copy as text</button>
-        </div>
-        <div class="btn-row">
-          <button class="btn" id="d-ing-paste">Paste a list</button>
-        </div>
-        <div id="d-ing-paste-wrap" hidden>
-          <label class="wide" style="margin-top:10px">Paste the list here
-            <textarea id="d-ing-text" rows="4" placeholder="Paste the text you were sent…"></textarea>
-          </label>
-          <div class="btn-row">
-            <button class="btn primary" id="d-ing-text-go">Add these ingredients</button>
-            <button class="btn" id="d-ing-text-cancel">Cancel</button>
-          </div>
-        </div>
       </div>
 
       <div class="block">

@@ -645,7 +645,19 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .btn-row + .block-body { margin-top: 10px; }
 /* pasted JSON is long and wraps; keep it small and scrollable rather
    than letting it grow the whole Settings page */
-#d-ing-text { font-size: 12px; line-height: 1.35; resize: vertical; max-height: 40vh; }
+/* The send-to-WhatsApp button. WhatsApp's green (#25D366) identifies the
+   destination; the glyph is a plain speech bubble of our own, not their
+   trademarked mark. */
+.wa-btn {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  margin-top: 10px;
+  background: #25D366;
+  border-color: #1FB855;
+  color: #06231A;
+  font-weight: 600;
+}
+.wa-btn:active { background: #1FB855; }
+.wa-ico { width: 20px; height: 20px; flex: 0 0 auto; }
 
 /* ---------- sheets ---------- */
 .sheet-host { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; }
