@@ -2,7 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '2.9.0';
+const APP_VERSION = '2.10.0';
 
 const S = {
   view: 'today',
@@ -159,27 +159,48 @@ function previewWelcomeTargets() {
     d.targets.car + '</b> g carbs · <b>' + d.targets.fat + '</b> g fat · <b>' + d.targets.fib + '</b> g fiber';
 }
 
+/* Seeding takes a moment, and a thumb on a phone double-taps. Without this
+   guard two taps ran the whole thing twice and left 36 ingredients and 4 saved
+   meals. The previous flow got away with it only because a confirm() dialog
+   happened to block the second tap. */
+let welcomeBusy = false;
+
 async function finishWelcome(withSample) {
+  if (welcomeBusy) return;
+
   const p = readWelcomeProfile();
   if (!p) { $('w-error').scrollIntoView({ block: 'nearest' }); return; }
 
-  const d = Calc.deriveTargets(p, 10);
-  S.settings = await DB.saveSettings({
-    profile: p, deficitPct: 10, targets: d.targets, welcomed: true, seeded: true
-  });
+  welcomeBusy = true;
+  $('welcome-go').disabled = true;
+  $('welcome-empty').disabled = true;
 
-  if (withSample) {
-    busy(true, 'Loading the sample plan…');
-    await seedLibrary();
+  try {
+    const d = Calc.deriveTargets(p, 10);
+    S.settings = await DB.saveSettings({
+      profile: p, deficitPct: 10, targets: d.targets, welcomed: true, seeded: true
+    });
+
+    if (withSample) {
+      busy(true, 'Loading the sample plan…');
+      await seedLibrary();
+      busy(false);
+    }
+
+    await reload();
+    renderAll();
+    $('welcome').hidden = true;
+    toast(withSample
+      ? 'Sample plan loaded — check the CHECK-tagged items against the pack'
+      : 'Targets set — tap + to log your first item', 3800);
+  } catch (e) {
+    /* Let them try again rather than stranding them on a dead screen. */
     busy(false);
+    welcomeBusy = false;
+    $('welcome-go').disabled = false;
+    $('welcome-empty').disabled = false;
+    toast(e.message || 'Could not finish setting up — try again', 5000);
   }
-
-  await reload();
-  renderAll();
-  $('welcome').hidden = true;
-  toast(withSample
-    ? 'Sample plan loaded — check the CHECK-tagged items against the pack'
-    : 'Targets set — tap + to log your first item', 3800);
 }
 
 async function reload() {
@@ -622,7 +643,7 @@ function ingRow(i, editable) {
   row.appendChild(main);
 
   const right = el('div', 'row-right');
-  right.appendChild(srcTag(i.source));
+  right.appendChild(srcTag(i.source, i.shared));
   right.appendChild(el('span', 'row-basis', 'per ' + Calc.basisOf(i) + ' ' + (i.unit || 'g')));
   row.appendChild(right);
 
@@ -655,7 +676,11 @@ function recipeRow(r) {
   return row;
 }
 
-function srcTag(source) {
+/* `shared` overrides the original source tag on purpose: where the values came
+   from originally matters less than the fact that they arrived from another
+   phone and nobody here has checked them against a package. */
+function srcTag(source, shared) {
+  if (shared) return el('span', 'src-tag src-shared', 'SHARED');
   const map = {
     off: ['src-off', 'OFF'],
     ai: ['src-ai', 'PHOTO'],
@@ -988,7 +1013,7 @@ async function runNameSearch() {
          Calc.fmt(r.car, 1) + ' C · ' + Calc.fmt(r.fat, 1) + ' F')));
       row.appendChild(main);
       const right = el('div', 'row-right');
-      right.appendChild(srcTag(r.source));
+      right.appendChild(srcTag(r.source, r.shared));
       right.appendChild(el('span', 'row-basis', 'per 100 ' + (r.unit || 'g')));
       row.appendChild(right);
       host.appendChild(row);
@@ -1366,8 +1391,14 @@ function renderLibrary() {
       if (av !== bv) return av - bv;
       return a.name.localeCompare(b.name);
     });
-  const toCheck = all.filter((i) => i.source === 'verify').length;
-  $('lib-count').textContent = all.length + ' INGREDIENTS' + (toCheck ? ' · ' + toCheck + ' TO CHECK' : '');
+  /* Shared items carry the SHARED tag instead of CHECK, so they must not be
+     counted as CHECK — a header saying "1 TO CHECK" with no CHECK tag visible
+     on any row is just confusing. They get their own count. */
+  const toCheck = all.filter((i) => i.source === 'verify' && !i.shared).length;
+  const shared = all.filter((i) => i.shared).length;
+  $('lib-count').textContent = all.length + ' INGREDIENTS' +
+    (toCheck ? ' · ' + toCheck + ' TO CHECK' : '') +
+    (shared ? ' · ' + shared + ' SHARED' : '');
   list.forEach((i) => host.appendChild(ingRow(i, true)));
   if (!list.length) host.appendChild(el('div', 'empty', 'Nothing matches.'));
 }
@@ -1900,6 +1931,56 @@ function bindSettings() {
       renderSettings();
       $('d-status').textContent = 'Restored ' + n.ingredients + ' ingredients and ' + n.entries + ' log entries.';
     } catch (e) { toast(e.message, 4500); }
+    busy(false);
+  });
+
+  /* ---------- share the ingredient list ---------- */
+  $('d-ing-export').addEventListener('click', async () => {
+    const n = S.ings.size;
+    if (!n) { toast('Your library is empty — nothing to send'); return; }
+    /* Photos are the whole size of the file. A dozen label shots turn a few KB
+       into several MB, which is the difference between something you can
+       message and something you cannot — so it is a choice, not a default. */
+    const withPhotos = confirm('Include the label photos?\n\nOK — complete, but a much bigger file.\nCancel — values only, small enough to send in a message.');
+    busy(true, 'Packing ' + n + ' ingredients…');
+    try {
+      const data = await DB.exportIngredients(withPhotos);
+      const json = JSON.stringify(data);
+      download(json, 'bibis-app-ingredients-' + Calc.today() + '.json', 'application/json');
+      $('d-ing-status').textContent = 'Exported ' + data.ingredients.length + ' ingredients' +
+        (withPhotos ? ' with photos' : ', values only') +
+        ' — ' + Math.max(1, Math.round(json.length / 1024)) + ' KB. Nothing personal is in this file.';
+    } catch (e) { toast(e.message, 4500); }
+    busy(false);
+  });
+
+  $('d-ing-import').addEventListener('click', () => { $('d-ing-file').value = ''; $('d-ing-file').click(); });
+  $('d-ing-file').addEventListener('change', async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    busy(true, 'Reading the list…');
+    try {
+      const data = JSON.parse(await file.text());
+      /* Say what is about to happen, with the real count, before touching
+         anything — an import that only ever adds is still someone else's data
+         arriving in your library. */
+      const count = (data.ingredients || []).length;
+      busy(false);
+      if (data.format !== 'bibis-app-ingredients') {
+        throw new Error('That file is not an ingredient list. A full backup goes through Restore backup above.');
+      }
+      if (!confirm('Add ' + count + ' ingredient' + (count === 1 ? '' : 's') +
+        ' to your library?\n\nNothing you already have is changed or removed. Duplicates by name and brand are skipped.')) return;
+      busy(true, 'Adding to your library…');
+      const r = await DB.importIngredients(data);
+      await reload();
+      renderAll();
+      if (S.view === 'library') renderLibrary();
+      $('d-ing-status').textContent = 'Added ' + r.added +
+        (r.skipped ? ', skipped ' + r.skipped + ' you already had' : '') +
+        ' — tagged SHARED in your Library.';
+      toast('Added ' + r.added + ' ingredient' + (r.added === 1 ? '' : 's'), 3600);
+    } catch (e) { toast(e.message, 5000); }
     busy(false);
   });
 

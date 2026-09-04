@@ -158,6 +158,30 @@ month in Excel.
 
 ---
 
+## Sending your ingredients to someone else
+
+**Settings › Share your ingredients › Export ingredients** writes a JSON file holding the
+ingredient list and nothing else: names, brands, barcodes, basis, and every nutrition
+value you have entered, including the vitamins and minerals. It carries **no** log, no
+weights, no body profile, no targets, no shopping list and no API keys, so it is safe to
+send in a message. You are asked whether to include the label photos — without them the
+file is a few KB; with them it can run to megabytes.
+
+Saved meals are deliberately left out. A meal is a list of ingredient ids that exist only
+on the phone that made it, so it would arrive pointing at nothing.
+
+The other person opens **Settings › Share your ingredients › Import ingredients** and picks
+the file. Importing only ever **adds**: nothing already in their library is changed or
+removed, and anything they already have under the same name and brand is skipped — so
+importing the same file twice adds nothing the second time. Imported items get fresh ids on
+their phone and show a **SHARED** tag in the Library, because nobody on that phone has yet
+checked those numbers against a package.
+
+A full **Export backup** is a different thing: that one is your whole phone, including your
+log and profile, and is meant for restoring onto your own phone, not for sending to people.
+
+---
+
 ## Updating the app later
 
 Edit a file on GitHub (or re-upload it) and **bump the cache name in `sw.js`**:

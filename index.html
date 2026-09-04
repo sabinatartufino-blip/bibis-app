@@ -301,6 +301,22 @@
       </div>
 
       <div class="block">
+        <div class="block-head"><h2>Share your ingredients</h2></div>
+        <p class="block-body">Sends the <b>ingredient list only</b> — names, brands, barcodes and
+          nutrition values. No log, no weights, no targets, no profile, no keys. Saved meals are
+          left out because they point at ingredients on this phone.</p>
+        <div class="btn-row">
+          <button class="btn" id="d-ing-export">Export ingredients</button>
+          <button class="btn" id="d-ing-import">Import ingredients</button>
+          <input type="file" id="d-ing-file" accept="application/json" hidden>
+        </div>
+        <p class="block-body">Importing <b>adds</b> to your library and never removes or changes
+          what is already there. Anything you already have under the same name and brand is
+          skipped, so the same file can be imported twice with no duplicates.</p>
+        <div class="derived" id="d-ing-status"></div>
+      </div>
+
+      <div class="block">
         <div class="brand-row">
           <img src="icons/mark-128.png" alt="Bibi's App">
           <div>

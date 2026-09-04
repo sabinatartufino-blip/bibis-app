@@ -560,6 +560,11 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .tab-ico { font-size: 17px; line-height: 1; }
 .tab.is-on { color: var(--accent); }
 /* how many things are still to buy, readable from the tab bar */
+/* `display: grid` below beats the browser's own [hidden] { display: none },
+   so an empty list was showing a "0" badge even with el.hidden set. Reading
+   the .hidden property in a test says true while the screen says otherwise —
+   this rule is what actually hides it. */
+.tab-badge[hidden] { display: none; }
 .tab-badge {
   position: absolute;
   top: 3px; left: 50%;
@@ -634,6 +639,10 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .src-seed { background: var(--accent-soft); color: var(--accent); }
 .src-usda { background: var(--fib-soft); color: var(--fib); }
 .src-swiss { background: var(--pro-soft); color: var(--pro); }
+/* came from another phone's library and has not been checked here */
+.src-shared { background: var(--car-soft); color: var(--car); }
+/* a note that follows a row of buttons needs air above it */
+.btn-row + .block-body { margin-top: 10px; }
 
 /* ---------- sheets ---------- */
 .sheet-host { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; }
