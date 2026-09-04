@@ -648,6 +648,33 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
   color: var(--accent); line-height: 1;
 }
 .veil-name em { font-style: normal; color: var(--brand-pink-ink); }
+.veil-meta {
+  margin-top: -10px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--muted); text-align: center; line-height: 1.7;
+  font-variant-numeric: tabular-nums;
+}
+.veil-meta b { color: var(--ink); font-weight: 600; }
+.veil-enter {
+  margin-top: 6px;
+  min-width: 168px;
+  padding: 13px 26px;
+  font-family: var(--sans); font-size: 16px; font-weight: 600;
+  letter-spacing: .01em;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: none;
+  border-radius: 999px;
+  box-shadow: 0 4px 16px -6px rgba(49,71,27,.5);
+  cursor: pointer;
+}
+.veil-enter:disabled {
+  background: var(--surface-2);
+  color: var(--faint);
+  box-shadow: none;
+  cursor: default;
+}
+.veil-enter:not(:disabled):active { transform: scale(.97); }
 .veil-tag {
   margin-top: -8px;
   font-family: var(--mono); font-size: 9.5px; letter-spacing: .18em;
@@ -727,6 +754,41 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
   color: var(--faint);
 }
 .welcome-fine b { color: var(--fat); font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; }
+
+/* ---------- update bar ---------- */
+.update-bar {
+  position: fixed;
+  left: 10px; right: 10px;
+  bottom: calc(68px + var(--safe-b));
+  z-index: 45;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 13.5px;
+  box-shadow: var(--shadow);
+}
+.update-bar[hidden] { display: none; }
+.update-bar > span { flex: 1 1 auto; }
+.update-btn {
+  flex: 0 0 auto;
+  font-family: var(--sans); font-size: 13px; font-weight: 600;
+  color: var(--accent);
+  background: var(--surface);
+  border: none; border-radius: 8px;
+  padding: 7px 13px;
+  cursor: pointer;
+}
+.update-skip {
+  flex: 0 0 auto;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--accent-ink);
+  background: none; border: none;
+  opacity: .75;
+  padding: 6px 4px;
+  cursor: pointer;
+}
 
 /* ---------- toast + busy ---------- */
 .toast {

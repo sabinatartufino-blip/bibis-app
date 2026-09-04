@@ -8,7 +8,7 @@
    Bump CACHE when you change any shell file, or phones keep the old one.
    ============================================================ */
 
-const CACHE = 'bibis-app-v6';
+const CACHE = 'bibis-app-v8';
 
 const SHELL = [
   './',
@@ -26,12 +26,18 @@ const SHELL = [
   'icons/mark-128.png'
 ];
 
+/* Deliberately NOT skipWaiting here. A new worker that seizes control while
+   the old page is still running leaves the app half-updated: new worker,
+   old JavaScript, and no sign to the user that anything happened. Instead
+   it waits, the page notices and offers a reload, and the update happens
+   at a moment the user chose. */
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE)
-      .then((c) => c.addAll(SHELL))
-      .then(() => self.skipWaiting())
-  );
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));
+});
+
+/* The page asks for the handover when the user taps Reload. */
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {

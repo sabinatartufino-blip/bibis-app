@@ -2,14 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '2.1.0';
-
-/* How long the opening screen is guaranteed to stay up. Below roughly a
-   second a splash reads as a glitch; much above it and you are just making
-   someone wait. Measured from script parse, not from boot(), so a slow
-   IndexedDB open eats into the floor rather than adding to it. */
-const SPLASH_MIN_MS = 1100;
-const BOOT_T0 = (window.performance && performance.now) ? performance.now() : Date.now();
+const APP_VERSION = '2.3.0';
 
 const S = {
   view: 'today',
@@ -48,6 +41,14 @@ const el = (tag, cls, text) => {
 
 async function boot() {
   $('about-ver').textContent = APP_VERSION;
+  /* The cache name is the thing that actually decides what code is running,
+     so show it too — a mismatch after a deploy explains itself. */
+  if (window.caches) {
+    caches.keys().then((names) => {
+      const el2 = $('about-cache');
+      if (el2) el2.textContent = names.length ? names.join(', ') : 'none';
+    }).catch(() => {});
+  }
   S.settings = await DB.settings();
   applyTheme(S.settings.theme);
   if (!S.settings.seeded) await seedLibrary();
@@ -66,22 +67,39 @@ async function boot() {
   bindFull();
   renderAll();
   if (!S.settings.welcomed) $('welcome').hidden = false;
-  await closeSplash();
+  armSplash();
   registerSW();
 }
 
-function closeSplash() {
+/* The opening screen waits for a tap rather than walking itself into the
+   day's log. Enter is armed only once the data is loaded, so it can never
+   land on a half-drawn screen. */
+function armSplash() {
+  const btn = $('veil-enter');
   const veil = $('boot-veil');
-  const now = (window.performance && performance.now) ? performance.now() : Date.now();
-  const wait = Math.max(0, SPLASH_MIN_MS - (now - BOOT_T0));
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      veil.classList.add('out');
-      /* Leave the node in place for the length of the fade, then take it out
-         of the layout entirely so it can never swallow a tap. */
-      setTimeout(() => { veil.hidden = true; resolve(); }, 450);
-    }, wait);
-  });
+
+  /* Since the screen now costs a tap, make it worth one: the date and where
+     the day stands, so a glance answers the question without entering. */
+  const total = Calc.sum(S.entries);
+  const t = S.settings.targets;
+  const lines = [Calc.prettyDate(S.date)];
+  if (S.entries.length) {
+    lines.push('<b>' + Calc.fmt(total.kcal, 0) + '</b> of ' + Calc.fmt(t.kcal, 0) + ' kcal' +
+      ' · <b>' + Calc.fmt(total.pro, 0) + '</b> of ' + Calc.fmt(t.pro, 0) + ' g protein');
+  } else {
+    lines.push('nothing logged yet');
+  }
+  $('veil-meta').innerHTML = lines.join('<br>');
+
+  btn.disabled = false;
+  btn.textContent = 'Enter';
+  btn.onclick = () => {
+    btn.disabled = true;
+    veil.classList.add('out');
+    /* Leave the node in place for the fade, then take it out of the layout
+       so it can never swallow a tap. */
+    setTimeout(() => { veil.hidden = true; }, 450);
+  };
 }
 
 function bindWelcome() {
@@ -148,9 +166,50 @@ function applyTheme(name) {
   if (meta) meta.setAttribute('content', THEME_BAR[t]);
 }
 
+/* ---------- update detection ----------
+   Offline caching means a deployed change does not reach the phone until
+   the cached shell is replaced, and none of that is visible from inside
+   the app. So it watches for a waiting worker and says so, instead of
+   leaving you to guess whether you are on the current version. */
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.register('sw.js').catch(() => { /* offline support unavailable */ });
+
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    /* left waiting by an earlier visit */
+    if (reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting);
+
+    reg.addEventListener('updatefound', () => {
+      const incoming = reg.installing;
+      if (!incoming) return;
+      incoming.addEventListener('statechange', () => {
+        /* An existing controller means this is an update rather than a
+           first install — only then is there anything worth saying. */
+        if (incoming.state === 'installed' && navigator.serviceWorker.controller) {
+          offerUpdate(incoming);
+        }
+      });
+    });
+
+    reg.update().catch(() => {});   // ask the server once per launch
+  }).catch(() => { /* no offline support; the app still works */ });
+
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
+}
+
+function offerUpdate(worker) {
+  const bar = $('update-bar');
+  if (!bar || !bar.hidden) return;
+  bar.hidden = false;
+  $('update-go').onclick = () => {
+    $('update-go').textContent = 'Updating…';
+    worker.postMessage({ type: 'SKIP_WAITING' });
+  };
+  $('update-later').onclick = () => { bar.hidden = true; };
 }
 
 /* ============================================================

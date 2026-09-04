@@ -25,13 +25,15 @@
 </head>
 <body>
 
-<!-- The opening screen. Held from the first paint until the database is open
-     and the day has rendered, with a floor of ~1.1 s so it reads as an
-     opening rather than a flicker, then faded out by boot(). -->
+<!-- The opening screen. Stays until Enter is tapped — the app never walks
+     itself into the day's log. The button is disabled until the database is
+     open, so Enter can never land on a half-loaded screen. -->
 <div class="veil" id="boot-veil">
   <div class="veil-inner">
     <img src="icons/icon-512.png" alt="" width="512" height="512">
     <div class="veil-name">Bibi&rsquo;s <em>App</em></div>
+    <div class="veil-meta" id="veil-meta"></div>
+    <button class="veil-enter" id="veil-enter" disabled>Opening…</button>
   </div>
 </div>
 
@@ -251,7 +253,7 @@
             <div class="brand-tag">Healthy food · Happier you</div>
           </div>
         </div>
-        <p class="block-body">Version <span id="about-ver"></span> — a tracker for one person. No account, no server, no analytics. Values you enter off a package are yours; values from Open Food Facts come from a community database and are worth a glance before you trust them.</p>
+        <p class="block-body">Version <span id="about-ver"></span> · cache <span id="about-cache">—</span> — a tracker for one person. No account, no server, no analytics. Values you enter off a package are yours; values from Open Food Facts come from a community database and are worth a glance before you trust them.</p>
       </div>
 
       <div class="pad-bottom"></div>
@@ -417,6 +419,12 @@
       <div class="sheet-actions"><button class="btn primary grow" id="w-save">Save</button></div>
     </div>
   </div>
+</div>
+
+<div class="update-bar" id="update-bar" hidden>
+  <span>A new version is ready.</span>
+  <button class="update-btn" id="update-go">Reload</button>
+  <button class="update-skip" id="update-later">Later</button>
 </div>
 
 <div class="toast" id="toast" hidden></div>
