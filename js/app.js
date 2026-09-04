@@ -2,7 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.6.0';
 
 const S = {
   view: 'today',
@@ -529,7 +529,7 @@ function renderAddResults() {
   }
 }
 
-function ingRow(i) {
+function ingRow(i, editable) {
   const row = el('button', 'row');
   row.dataset.kind = 'ing';
   row.dataset.id = i.id;
@@ -549,6 +549,10 @@ function ingRow(i) {
   right.appendChild(srcTag(i.source));
   right.appendChild(el('span', 'row-basis', 'per ' + Calc.basisOf(i) + ' ' + (i.unit || 'g')));
   row.appendChild(right);
+
+  /* In Library the row opens the editor, so say so. Without this the row
+     looks like a read-only list entry and the editor stays undiscovered. */
+  if (editable) row.appendChild(el('span', 'row-edit', '✎'));
   return row;
 }
 
@@ -926,6 +930,7 @@ function bindReview() {
     const file = ev.target.files && ev.target.files[0];
     if (!file) return;
     try {
+      if (S.photoTarget !== 'labelPhoto' && S.photoTarget !== 'frontPhoto') S.photoTarget = 'labelPhoto';
       S.draftPhotos[S.photoTarget] = await Vision.prepareImage(file);
       renderReviewPhotos();
       toast('Photo attached');
@@ -965,16 +970,44 @@ function renderReviewPhotos() {
   const host = $('review-photos');
   host.textContent = '';
   [['labelPhoto', 'Nutrition label'], ['frontPhoto', 'Product']].forEach(([key, cap]) => {
-    const blob = S.draftPhotos[key] || (S.draft && S.draft[key]);
+    const pending = S.draftPhotos[key];
+    if (pending === 'remove') return;                    // struck out, awaiting Save
+    const blob = pending || (S.draft && S.draft[key]);
     if (!blob) return;
+
     const fig = el('figure');
     const img = el('img');
     img.src = URL.createObjectURL(blob);
     img.alt = cap;
     fig.appendChild(img);
-    fig.appendChild(el('figcaption', null, cap));
+    fig.appendChild(el('figcaption', null, cap + (pending ? ' · new' : '')));
+
+    const acts = el('div', 'photo-row-acts');
+    const swap = el('button', 'mini-btn', 'Replace');
+    swap.type = 'button';
+    swap.onclick = () => { S.photoTarget = key; $('r-photo-file').value = ''; $('r-photo-file').click(); };
+    const drop = el('button', 'mini-btn danger', 'Remove');
+    drop.type = 'button';
+    drop.onclick = () => {
+      /* 'remove' rather than deleting the key: an absent key means "leave
+         whatever is already saved alone", which is the opposite intent. */
+      S.draftPhotos[key] = 'remove';
+      renderReviewPhotos();
+      toast('Photo will be removed when you save');
+    };
+    acts.appendChild(swap);
+    acts.appendChild(drop);
+    fig.appendChild(acts);
     host.appendChild(fig);
   });
+}
+
+/* three states: a new blob, an explicit removal, or leave as it was */
+function resolvePhoto(key, prev) {
+  const pending = S.draftPhotos[key];
+  if (pending === 'remove') return null;
+  if (pending) return pending;
+  return (prev && prev[key]) || null;
 }
 
 async function saveReview() {
@@ -994,8 +1027,8 @@ async function saveReview() {
     defaultG: (prev && prev.defaultG) || Math.round(basis),
     defaultSlot: (prev && prev.defaultSlot) || S.addSlot,
     source: S.draft.source === 'verify' ? 'manual' : (S.draft.source || 'manual'),
-    labelPhoto: S.draftPhotos.labelPhoto || (prev && prev.labelPhoto) || null,
-    frontPhoto: S.draftPhotos.frontPhoto || (prev && prev.frontPhoto) || null,
+    labelPhoto: resolvePhoto('labelPhoto', prev),
+    frontPhoto: resolvePhoto('frontPhoto', prev),
     updated: Date.now()
   };
   MACROS.forEach((k) => { ing[k] = Calc.num($('r-' + k).value); });
@@ -1218,7 +1251,11 @@ function renderLibrary() {
 
   if (S.libTab === 'rec') {
     const list = S.recipes.filter((r) => !q || m(r.name));
-    list.forEach((r) => host.appendChild(recipeRow(r)));
+    list.forEach((r) => {
+      const row = recipeRow(r);
+      row.appendChild(el('span', 'row-edit', '✎'));
+      host.appendChild(row);
+    });
     $('lib-count').textContent = S.recipes.length + ' SAVED MEALS';
     if (!list.length) host.appendChild(el('div', 'empty', 'No saved meals yet. Tap + to build one.'));
     return;
@@ -1235,7 +1272,7 @@ function renderLibrary() {
     });
   const toCheck = all.filter((i) => i.source === 'verify').length;
   $('lib-count').textContent = all.length + ' INGREDIENTS' + (toCheck ? ' · ' + toCheck + ' TO CHECK' : '');
-  list.forEach((i) => host.appendChild(ingRow(i)));
+  list.forEach((i) => host.appendChild(ingRow(i, true)));
   if (!list.length) host.appendChild(el('div', 'empty', 'Nothing matches.'));
 }
 
