@@ -253,6 +253,10 @@
             <div class="brand-tag">Healthy food · Happier you</div>
           </div>
         </div>
+        <p class="block-body" id="about-sources">Food data: <b>Swiss Food Composition Database</b> V 7.1
+          © Federal Food Safety and Veterinary Office (FSVO), naehrwertdaten.ch — used with acknowledgment,
+          as their terms require. Also <b>USDA FoodData Central</b> and <b>Open Food Facts</b>.
+          Reference intakes are the EU NRVs from Regulation (EU) No 1169/2011, Annex XIII.</p>
         <p class="block-body">Version <span id="about-ver"></span> · cache <span id="about-cache">—</span> — a tracker for one person. No account, no server, no analytics. Values you enter off a package are yours; values from Open Food Facts come from a community database and are worth a glance before you trust them.</p>
       </div>
 
@@ -285,11 +289,15 @@
       </div>
       <div class="method-row">
         <button class="method" id="m-barcode"><b>Scan barcode</b><span>Looks the product up in Open Food Facts</span></button>
-        <button class="method" id="m-photo"><b>Photograph the label</b><span>Reads the values off the nutrition table</span></button>
+        <button class="method" id="m-photo"><b>Photograph the label</b><span>Opens the camera and reads the nutrition table</span></button>
+        <button class="method" id="m-album"><b>Pick a label photo from your album</b><span>For a photo you already took, or one someone sent you</span></button>
         <button class="method" id="m-name"><b>Search by name</b><span>For food with no barcode and no label — kiwi, carrots, a peach</span></button>
         <button class="method" id="m-manual"><b>Type it in</b><span>Enter the numbers yourself</span></button>
       </div>
+      <!-- Two inputs, deliberately. `capture` forces the camera and REMOVES
+           the gallery from Android's picker, so one input cannot do both. -->
       <input type="file" id="photo-input" accept="image/*" capture="environment" hidden>
+      <input type="file" id="album-input" accept="image/*" hidden>
     </div>
   </div>
 
@@ -353,10 +361,13 @@
       </details>
 
       <div class="photo-actions">
-        <button class="btn" id="r-add-label">Attach label photo</button>
-        <button class="btn" id="r-add-front">Attach product photo</button>
-        <input type="file" id="r-photo-file" accept="image/*" capture="environment" hidden>
+        <button class="btn" id="r-add-label">Label photo</button>
+        <button class="btn" id="r-add-front">Product photo</button>
       </div>
+      <div class="photo-hint">Each opens your camera or your album — whichever you pick in Android's chooser.</div>
+      <!-- No `capture` here on purpose: without it Android offers Camera,
+           Gallery and Files, so one button covers every case. -->
+      <input type="file" id="r-photo-file" accept="image/*" hidden>
       <div class="sheet-actions">
         <button class="btn danger" id="r-delete" hidden>Delete</button>
         <button class="btn primary grow" id="r-save">Save to library</button>
@@ -431,6 +442,7 @@
 <div class="busy" id="busy" hidden><div class="spinner"></div><span id="busy-text">Working…</span></div>
 
 <script src="js/nutrients.js"></script>
+<script src="js/swiss.js"></script>
 <script src="js/db.js"></script>
 <script src="js/calc.js"></script>
 <script src="js/vision.js"></script>

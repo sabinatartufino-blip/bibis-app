@@ -2,7 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.5.0';
 
 const S = {
   view: 'today',
@@ -69,6 +69,8 @@ async function boot() {
   if (!S.settings.welcomed) $('welcome').hidden = false;
   armSplash();
   registerSW();
+  /* 250 KB of food data, fetched once the screen is up rather than before it. */
+  if (typeof Swiss !== 'undefined') setTimeout(() => Swiss.preload(), 400);
 }
 
 /* The opening screen waits for a tap rather than walking itself into the
@@ -460,6 +462,11 @@ function bindAdd() {
     $('photo-input').value = '';
     $('photo-input').click();
   });
+  $('m-album').addEventListener('click', () => {
+    S.photoTarget = 'read';
+    $('album-input').value = '';
+    $('album-input').click();
+  });
   $('m-manual').addEventListener('click', () => {
     openReview({
       name: '', brand: '', barcode: '', basis: 100, unit: 'g',
@@ -467,6 +474,7 @@ function bindAdd() {
     }, { isNew: true });
   });
   $('photo-input').addEventListener('change', onPhotoRead);
+  $('album-input').addEventListener('change', onPhotoRead);
 
   $('add-results').addEventListener('click', (e) => {
     const row = e.target.closest('.row');
@@ -566,6 +574,7 @@ function srcTag(source) {
     off: ['src-off', 'OFF'],
     ai: ['src-ai', 'PHOTO'],
     usda: ['src-usda', 'USDA'],
+    swiss: ['src-swiss', 'SWISS'],
     lookup: ['src-ai', 'LOOKED UP'],
     manual: ['src-manual', 'TYPED'],
     seed: ['src-seed', 'PLAN'],
@@ -857,11 +866,14 @@ function openNameSearch(q, autorun, forExisting) {
 }
 
 function sourceLine() {
-  if ((S.settings.usdaKey || '').trim()) return 'Searching USDA FoodData Central.';
+  const swiss = (typeof Swiss !== 'undefined')
+    ? 'Searching the Swiss database' + (Swiss.ready() ? ' (' + Swiss.count() + ' foods, offline)' : '') + ', then '
+    : '';
+  if ((S.settings.usdaKey || '').trim()) return swiss + 'USDA FoodData Central.';
   if (S.settings.aiProvider !== 'none' && (S.settings.aiKey || '').trim()) {
-    return 'No USDA key, so the model answers from reference tables. Add a USDA key under Settings for the real thing.';
+    return swiss + 'the model, which answers from reference tables.';
   }
-  return 'No keys set, so this searches Open Food Facts — branded products, patchy for raw food. A USDA key under Settings fixes that.';
+  return swiss + 'Open Food Facts. Add a USDA key under Settings for the reference tables.';
 }
 
 async function runNameSearch() {

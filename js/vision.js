@@ -242,6 +242,18 @@ const Vision = (() => {
        The reason is carried out on `_warn` so the UI can still say so. */
     let warn = '';
 
+    /* Tier 0: the Swiss dataset that ships with the app. No key, no
+       request, no signal needed, and it knows Swiss foods the others do
+       not. Only falls through when it has nothing for this name. */
+    if (typeof Swiss !== 'undefined') {
+      try {
+        const local = await Swiss.search(q, 10);
+        if (local.length) return local;
+      } catch (e) {
+        warn = e.message;
+      }
+    }
+
     if (cleanKey(settings.usdaKey)) {
       try {
         return await searchUsda(q, settings.usdaKey);

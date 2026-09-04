@@ -11,7 +11,11 @@ Four ways to get a food's numbers in:
 2. **Photograph the nutrition label** → a vision model reads it and returns the values
    *plus the basis they apply to*
 3. **Search by name** → for food with no barcode and no label: a kiwi, a carrot, rolled oats.
-   Tries USDA FoodData Central first, then the vision model, then an Open Food Facts text search
+   Answers from the **Swiss Food Composition Database bundled with the app** — 1 246 foods,
+   ~35 nutrients each, instant and offline with no key. Falls through to USDA FoodData Central,
+   then the vision model, then an Open Food Facts text search when the Swiss data has no match.
+   Searching accepts German, French and Serbian/Croatian food names: *Gruyère* finds *Greyerzer*,
+   *Hüttenkäse* finds *Cottage cheese*, *Rüebli* finds *Carrot*
 4. **Type them in** → always available
 
 Nothing an extraction produces is saved until you look at it and tap Save. A misread
@@ -171,6 +175,29 @@ mechanism that makes it work offline. With it, the next launch picks up the chan
   Mifflin–St Jeor for the resting rate, protein at 2.0 g/kg, fat floored near 0.9 g/kg,
   carbs taking the remaining energy. Worth confirming with a physician or a registered
   dietitian who can check them against bloodwork.
+
+## Where the food data comes from
+
+| Source | Coverage | Key | Offline |
+|---|---|---|---|
+| Swiss Food Composition Database V 7.1 | 1 246 Swiss/European foods, ~35 nutrients | none | yes, bundled |
+| USDA FoodData Central | US reference tables, full nutrient panel | free | no |
+| Open Food Facts | branded products worldwide, by barcode | none | no |
+| Vision model | whatever is printed on the label in front of you | free tier | no |
+
+The Swiss data is published by the **Federal Food Safety and Veterinary Office (FSVO)** at
+[naehrwertdaten.ch](https://naehrwertdaten.ch) and is free to use, including in a nutrition
+diary app, **subject to acknowledgment of the source** — which is why the attribution in
+Settings › About must stay. `data/swiss.json` is generated from their Excel release; the
+converter is documented at the top of the file it produces.
+
+Reference intake percentages are the EU Nutrient Reference Values from Regulation (EU)
+No 1169/2011, Annex XIII — the same figures printed as "% RI" on European labels.
+
+Three conventions in the Swiss source are worth knowing, because they decide what the app
+claims: a *trace* value and a *below detection limit* value are both stored as **0**, while
+*not determined* is stored as **absent**. Absent is never summed as zero — the day's totals
+say what share of your energy each nutrient figure actually covers.
 
 ## Visual identity
 

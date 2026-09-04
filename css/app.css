@@ -501,6 +501,7 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .src-manual { background: var(--surface-2); color: var(--faint); }
 .src-seed { background: var(--accent-soft); color: var(--accent); }
 .src-usda { background: var(--fib-soft); color: var(--fib); }
+.src-swiss { background: var(--pro-soft); color: var(--pro); }
 
 /* ---------- sheets ---------- */
 .sheet-host { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; }
@@ -561,6 +562,7 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .photo-row figure { margin: 0; display: flex; flex-direction: column; gap: 3px; }
 .photo-row figcaption { font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
 .photo-actions { display: flex; gap: 8px; }
+.photo-hint { font-size: 11.5px; color: var(--faint); margin-top: -4px; line-height: 1.4; }
 
 .cam-wrap { position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 4/3; }
 .cam-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
