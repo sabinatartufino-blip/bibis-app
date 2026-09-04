@@ -26,7 +26,7 @@ const NUTRIENTS = [
   ['pro',  'Protein',           'g',    null, 'energy', 1],
   ['car',  'Carbohydrate',      'g',    null, 'energy', 1],
   ['fat',  'Fat',               'g',    null, 'energy', 1],
-  ['fib',  'Fibre',             'g',    null, 'energy', 1],
+  ['fib',  'Fiber',             'g',    null, 'energy', 1],
 
   ['sat',  'of which saturates','g',    null, 'fat',    1],
   ['mono', 'Monounsaturated',   'g',    null, 'fat',    1],

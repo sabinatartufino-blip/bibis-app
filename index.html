@@ -134,14 +134,9 @@
   <section class="view" id="view-trends" hidden>
     <header class="bar"><div class="bar-title"><h1>Trends</h1><span class="bar-sub">Last 14 days</span></div></header>
     <div class="scroll">
-      <div class="block">
-        <div class="block-head"><h2>Energy vs target</h2><span class="block-note" id="tr-kcal-avg"></span></div>
-        <div id="chart-kcal" class="chart"></div>
-      </div>
-      <div class="block">
-        <div class="block-head"><h2>Protein vs target</h2><span class="block-note" id="tr-pro-avg"></span></div>
-        <div id="chart-pro" class="chart"></div>
-      </div>
+      <!-- One block per tracked nutrient, built in renderTrends so adding
+           or reordering a chart is a one-line change. -->
+      <div id="trend-charts"></div>
       <div class="block">
         <div class="block-head"><h2>Body weight</h2><span class="block-note" id="tr-wt-note"></span></div>
         <div id="chart-wt" class="chart"></div>

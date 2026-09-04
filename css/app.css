@@ -360,6 +360,10 @@ body {
   box-shadow: var(--shadow);
 }
 .block-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+/* Trend headings carry a long stats line; side by side on a phone the
+   heading wraps mid-phrase, so give the note its own row. */
+.block-head.stack { flex-direction: column; align-items: flex-start; gap: 1px; }
+.block-head.stack h2 { flex: 0 0 auto; }
 .block-head h2 { margin: 0; flex: 1 1 auto; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
 .block-note, .block-body { font-size: 13px; color: var(--muted); }
 .block-note { font-family: var(--mono); font-size: 11px; color: var(--faint); }

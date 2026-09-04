@@ -2,7 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.7.0';
 
 const S = {
   view: 'today',
@@ -1415,32 +1415,60 @@ function openWeight() {
    TRENDS
    ============================================================ */
 
+/* What Trends charts, in order: key, heading, unit, bar colour.
+   Adding or reordering a chart is a one-line change here. */
+const TRENDS = [
+  ['kcal', 'Energy',  'kcal', 'var(--accent)'],
+  ['pro',  'Protein', 'g',    'var(--pro-bar)'],
+  ['fib',  'Fiber',   'g',    'var(--fib-bar)'],
+  ['fat',  'Fat',     'g',    'var(--fat-bar)']
+];
+
 async function renderTrends() {
   const days = [];
   for (let i = 13; i >= 0; i--) days.push(Calc.shiftDate(Calc.today(), -i));
   const rows = await DB.entriesInRange(days[0], days[days.length - 1]);
 
-  const byDate = new Map(days.map((d) => [d, { kcal: 0, pro: 0 }]));
+  const blank = () => {
+    const o = {};
+    TRENDS.forEach(([k]) => { o[k] = 0; });
+    return o;
+  };
+  const byDate = new Map(days.map((d) => [d, blank()]));
   rows.forEach((e) => {
     const bucket = byDate.get(e.date);
     if (!bucket) return;
-    bucket.kcal += Calc.num(e.kcal);
-    bucket.pro += Calc.num(e.pro);
+    TRENDS.forEach(([k]) => { bucket[k] += Calc.num(e[k]); });
   });
 
-  const kcal = days.map((d) => byDate.get(d).kcal);
-  const pro = days.map((d) => byDate.get(d).pro);
-  const logged = kcal.filter((v) => v > 0);
-  const loggedPro = pro.filter((v) => v > 0);
+  const host = $('trend-charts');
+  host.textContent = '';
 
-  $('chart-kcal').innerHTML = barChart(days, kcal, S.settings.targets.kcal, 'var(--fib-bar)');
-  $('chart-pro').innerHTML = barChart(days, pro, S.settings.targets.pro, 'var(--pro-bar)');
-  $('tr-kcal-avg').textContent = logged.length
-    ? 'AVG ' + Math.round(logged.reduce((a, b) => a + b, 0) / logged.length) + ' KCAL OVER ' + logged.length + ' LOGGED DAYS'
-    : 'NOTHING LOGGED YET';
-  $('tr-pro-avg').textContent = loggedPro.length
-    ? 'AVG ' + Math.round(loggedPro.reduce((a, b) => a + b, 0) / loggedPro.length) + ' G OVER ' + loggedPro.length + ' LOGGED DAYS'
-    : 'NOTHING LOGGED YET';
+  TRENDS.forEach(([key, heading, unit, color]) => {
+    const values = days.map((d) => byDate.get(d)[key]);
+    const target = Calc.num(S.settings.targets[key]);
+
+    /* Average over logged days only. Counting an untracked day as zero
+       would drag every average down and make the number meaningless. */
+    const logged = values.filter((v) => v > 0);
+    const avg = logged.length ? logged.reduce((a, b) => a + b, 0) / logged.length : 0;
+    const dp = key === 'kcal' ? 0 : 1;
+
+    const block = el('div', 'block');
+    const head = el('div', 'block-head stack');
+    head.appendChild(el('h2', null, heading + ' vs target'));
+    head.appendChild(el('span', 'block-note', logged.length
+      ? 'AVG ' + Calc.fmt(avg, dp) + ' ' + unit.toUpperCase() +
+        (target ? ' · TARGET ' + Calc.fmt(target, 0) : '') +
+        ' · ' + logged.length + ' LOGGED DAY' + (logged.length === 1 ? '' : 'S')
+      : 'NOTHING LOGGED YET'));
+    block.appendChild(head);
+
+    const chart = el('div', 'chart');
+    chart.innerHTML = barChart(days, values, target, color);
+    block.appendChild(chart);
+    host.appendChild(block);
+  });
 
   const wt = S.weights.slice(-30);
   $('chart-wt').innerHTML = wt.length > 1
