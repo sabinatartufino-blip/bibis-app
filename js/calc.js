@@ -61,16 +61,23 @@ const Calc = {
   },
 
   /* ---------- target derivation ----------
-     Mifflin–St Jeor, female. Protein at 2.0 g/kg because the goal is
-     adding muscle after 50, where the usual 1.2 g/kg RDA is far too low.
-     Fat floored near 0.9 g/kg. Carbs take whatever energy is left. */
+     Mifflin–St Jeor. Protein at 2.0 g/kg because the goal is adding muscle
+     after 50, where the usual 1.2 g/kg RDA is far too low. Fat floored near
+     0.9 g/kg. Carbs take whatever energy is left.
+
+     The sex constant is the one term here you cannot fudge: +5 for men,
+     −161 for women — a 166 kcal spread on otherwise identical numbers. It
+     used to be hardcoded to −161, which was right for one user and wrong for
+     anyone the app gets handed to. Unset still means female, so existing
+     targets are unchanged. */
   deriveTargets(profile, deficitPct) {
     const w = Calc.num(profile.weight) || 61;
     const h = Calc.num(profile.height) || 170;
     const a = Calc.num(profile.age) || 50;
     const act = Calc.num(profile.activity) || 1.375;
+    const sexConst = profile.sex === 'male' ? 5 : -161;
 
-    const rmr = 10 * w + 6.25 * h - 5 * a - 161;
+    const rmr = 10 * w + 6.25 * h - 5 * a + sexConst;
     const tdee = rmr * act;
     const kcal = Math.round(tdee * (1 - Calc.num(deficitPct) / 100) / 10) * 10;
 

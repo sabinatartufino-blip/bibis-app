@@ -2,7 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '2.8.0';
+const APP_VERSION = '2.9.0';
 
 const S = {
   view: 'today',
@@ -52,7 +52,11 @@ async function boot() {
   }
   S.settings = await DB.settings();
   applyTheme(S.settings.theme);
-  if (!S.settings.seeded) await seedLibrary();
+  /* A new install starts empty. The sample plan is one person's meal plan, so
+     it is offered on the welcome screen rather than loaded over anyone who
+     opens the app. Existing installs already have `seeded` set and their own
+     data in the database, so removing the automatic seed cannot delete
+     anything that is already there. */
   await reload();
   bindNav();
   bindToday();
@@ -107,20 +111,75 @@ function armSplash() {
 }
 
 function bindWelcome() {
-  $('welcome-go').addEventListener('click', async () => {
-    S.settings = await DB.saveSettings({ welcomed: true });
-    $('welcome').hidden = true;
+  /* Live preview, so the numbers are visible before committing to them. */
+  ['w-age', 'w-height', 'w-weight', 'w-sex', 'w-activity'].forEach((id) => {
+    $(id).addEventListener('input', previewWelcomeTargets);
+    $(id).addEventListener('change', previewWelcomeTargets);
   });
-  $('welcome-empty').addEventListener('click', async () => {
-    if (!confirm('Start with nothing in the library? Your plan’s 18 ingredients and 2 saved meals are removed. Settings › Your data › Erase everything puts them back.')) return;
-    await Promise.all([DB.clear('ingredients'), DB.clear('recipes')]);
-    S.thumbs.clear();
-    S.settings = await DB.saveSettings({ welcomed: true });
-    await reload();
-    renderAll();
-    $('welcome').hidden = true;
-    toast('Empty library — tap + to add your first item', 3600);
+
+  $('welcome-go').addEventListener('click', () => finishWelcome(false));
+  $('welcome-empty').addEventListener('click', () => finishWelcome(true));
+}
+
+/* Read the form, or return null and say what is missing. Ranges are wide on
+   purpose — the job is to catch a typo like 17 cm or 610 kg, not to police
+   anyone's body. */
+function readWelcomeProfile() {
+  const age = Calc.num($('w-age').value);
+  const height = Calc.num($('w-height').value);
+  const weight = Calc.num($('w-weight').value);
+  const err = $('w-error');
+
+  const fail = (msg) => {
+    err.textContent = msg;
+    err.hidden = false;
+    return null;
+  };
+
+  if (!age || !height || !weight) return fail('Age, height and weight are all needed to work out your targets.');
+  if (age < 14 || age > 100) return fail('That age looks like a typo — it should be between 14 and 100.');
+  if (height < 120 || height > 230) return fail('That height looks like a typo — it should be in centimetres, between 120 and 230.');
+  if (weight < 30 || weight > 250) return fail('That weight looks like a typo — it should be in kilograms, between 30 and 250.');
+
+  err.hidden = true;
+  return {
+    age, height, weight,
+    sex: $('w-sex').value === 'male' ? 'male' : 'female',
+    activity: parseFloat($('w-activity').value) || 1.375
+  };
+}
+
+function previewWelcomeTargets() {
+  const p = readWelcomeProfile();
+  const out = $('w-derived');
+  if (!p) { out.textContent = 'Fill these in and your targets appear here.'; return; }
+  const d = Calc.deriveTargets(p, 10);
+  out.innerHTML = 'Resting burn <b>' + d.rmr + '</b> kcal · with activity <b>' + d.tdee + '</b> kcal<br>' +
+    'Target <b>' + d.targets.kcal + '</b> kcal · <b>' + d.targets.pro + '</b> g protein · <b>' +
+    d.targets.car + '</b> g carbs · <b>' + d.targets.fat + '</b> g fat · <b>' + d.targets.fib + '</b> g fiber';
+}
+
+async function finishWelcome(withSample) {
+  const p = readWelcomeProfile();
+  if (!p) { $('w-error').scrollIntoView({ block: 'nearest' }); return; }
+
+  const d = Calc.deriveTargets(p, 10);
+  S.settings = await DB.saveSettings({
+    profile: p, deficitPct: 10, targets: d.targets, welcomed: true, seeded: true
   });
+
+  if (withSample) {
+    busy(true, 'Loading the sample plan…');
+    await seedLibrary();
+    busy(false);
+  }
+
+  await reload();
+  renderAll();
+  $('welcome').hidden = true;
+  toast(withSample
+    ? 'Sample plan loaded — check the CHECK-tagged items against the pack'
+    : 'Targets set — tap + to log your first item', 3800);
 }
 
 async function reload() {
@@ -1718,13 +1777,14 @@ function lineChart(labels, values) {
    ============================================================ */
 
 function bindSettings() {
-  ['p-age', 'p-height', 'p-weight', 'p-activity'].forEach((id) => {
+  ['p-age', 'p-height', 'p-weight', 'p-sex', 'p-activity'].forEach((id) => {
     $(id).addEventListener('change', async () => {
       S.settings = await DB.saveSettings({
         profile: {
           age: Calc.num($('p-age').value),
           height: Calc.num($('p-height').value),
           weight: Calc.num($('p-weight').value),
+          sex: $('p-sex').value === 'male' ? 'male' : 'female',
           activity: parseFloat($('p-activity').value)
         }
       });
@@ -1862,7 +1922,8 @@ function bindSettings() {
     await DB.wipe();
     S.thumbs.clear();
     S.settings = await DB.settings();
-    await seedLibrary();
+    /* No re-seed: erased means erased, and the welcome screen below offers the
+       sample plan again for anyone who wants it back. */
     await reload();
     renderAll();
     renderSettings();
@@ -1876,6 +1937,7 @@ function renderSettings() {
   $('p-age').value = p.age;
   $('p-height').value = p.height;
   $('p-weight').value = p.weight;
+  $('p-sex').value = p.sex === 'male' ? 'male' : 'female';
   $('p-activity').value = String(p.activity);
   $('t-kcal').value = t.kcal;
   $('t-pro').value = t.pro;

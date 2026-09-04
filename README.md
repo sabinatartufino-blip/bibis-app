@@ -59,8 +59,18 @@ require it, and Pages gives it to you for free.
 2. Menu (⋮) → **Add to Home screen** → **Install**.
 3. Launch it from the icon. No address bar, no tabs — it behaves as its own app.
 
-It opens already loaded with your current plan: 18 ingredients, plus **Morning bowl** and
-**Afternoon shake** as saved meals, so a day is two taps rather than eighteen.
+On first launch it asks for age, height, weight, sex and activity, derives daily targets
+from those (Mifflin–St Jeor, minus 10 %, protein at 2 g/kg), and starts with an **empty
+library** — so anyone can install it from this URL and get their own numbers rather than
+inheriting someone else's. Every target stays editable in Settings › Daily targets.
+
+If you want something to look at first, **or start with the sample plan** on that screen
+loads 18 ingredients plus **Morning bowl** and **Afternoon shake** as saved meals.
+
+Nothing is shared between installs. All data lives in that phone's own browser storage —
+no account, no server, no sync — so two people using this URL never see each other's log.
+Android Chrome is the target: barcode scanning uses `BarcodeDetector`, which iOS Safari
+does not implement. Photographing a label and typing values work on any phone.
 
 ### 4. Add a USDA key for name searches (optional, one minute, free)
 

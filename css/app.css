@@ -855,7 +855,8 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 
 .welcome-points {
   list-style: none;
-  margin: 30px 0 0;
+  margin: 26px 0 0;
+  border-top: 1px solid var(--line);
   padding: 0;
   display: flex; flex-direction: column; gap: 2px;
   width: 100%;
@@ -875,7 +876,30 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
   margin-bottom: 2px;
 }
 
-.welcome-actions { width: 100%; margin-top: 22px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+/* the first-run profile form: a card, so it reads as the one thing on this
+   screen that asks something of you rather than another block of prose */
+.welcome-form {
+  width: 100%;
+  margin-top: 26px;
+  padding: 15px 14px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.welcome-form-head {
+  margin: 0 0 11px;
+  font-size: 15px; font-weight: 600;
+  color: var(--ink);
+}
+.welcome-note {
+  margin: 9px 0 0;
+  font-size: 12.5px; line-height: 1.45;
+  color: var(--pro);
+}
+.welcome-note[hidden] { display: none; }
+
+.welcome-actions { width: 100%; margin-top: 18px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .welcome-actions .btn { padding: 13px 16px; font-size: 15.5px; font-weight: 600; }
 .welcome-actions .btn small {
   display: block;

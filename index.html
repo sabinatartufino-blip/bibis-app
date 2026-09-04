@@ -45,6 +45,45 @@
     <img class="welcome-hero" src="icons/icon-512.png" alt="" width="512" height="512">
     <h1 class="sr-only">Bibi&rsquo;s App — healthy food, happier you</h1>
 
+    <!-- The form comes FIRST. It is the one thing a new user has to do, and
+         burying it under three paragraphs of features meant scrolling past the
+         explanation to find the task. The five inputs are what the
+         Mifflin–St Jeor equation needs, so the targets on the Today screen are
+         the user's own from the first launch rather than someone else's to be
+         discovered and corrected later. -->
+    <div class="welcome-form">
+      <h2 class="welcome-form-head">Your daily targets</h2>
+      <div class="form-grid">
+        <label>Age<input type="number" id="w-age" inputmode="numeric" min="14" max="100" placeholder="40"></label>
+        <label>Height cm<input type="number" id="w-height" inputmode="decimal" min="120" max="230" placeholder="170"></label>
+        <label>Weight kg<input type="number" id="w-weight" step="0.1" inputmode="decimal" min="30" max="250" placeholder="70"></label>
+        <label>Sex
+          <select id="w-sex">
+            <option value="female">Female</option>
+            <option value="male">Male</option>
+          </select>
+        </label>
+        <label class="wide">Activity
+          <select id="w-activity">
+            <option value="1.2">Desk-bound</option>
+            <option value="1.375" selected>Light — 1–2 sessions a week</option>
+            <option value="1.55">Moderate — 3–5 a week</option>
+            <option value="1.725">Active — most days</option>
+          </select>
+        </label>
+      </div>
+      <div class="derived" id="w-derived">Fill these in and your targets appear here.</div>
+      <p class="welcome-note" id="w-error" hidden></p>
+    </div>
+
+    <div class="welcome-actions">
+      <button class="btn primary" id="welcome-go">
+        Start
+        <small>an empty library — add your first item with +</small>
+      </button>
+      <button class="link-btn" id="welcome-empty">or start with the sample plan</button>
+    </div>
+
     <ul class="welcome-points">
       <li>
         <b>Scan it, photograph it, or type it</b>
@@ -53,7 +92,7 @@
       </li>
       <li>
         <b>Save a meal once, log it in one tap</b>
-        Your morning bowl is eleven ingredients. You enter that once, not every morning.
+        A breakfast bowl of eleven ingredients gets entered once, not every morning.
       </li>
       <li>
         <b>Nothing leaves this phone</b>
@@ -61,16 +100,10 @@
       </li>
     </ul>
 
-    <div class="welcome-actions">
-      <button class="btn primary" id="welcome-go">
-        Start with my plan
-        <small>18 ingredients · Morning bowl · Afternoon shake</small>
-      </button>
-      <button class="link-btn" id="welcome-empty">or start with an empty library</button>
-    </div>
-
-    <p class="welcome-fine">Three items — the whey, the Zene sauce and the coconut milk —
-      carry estimated values and are tagged <b>CHECK</b> until you compare them to the pack.</p>
+    <p class="welcome-fine">Targets are a starting point from a standard equation
+      (Mifflin–St Jeor, minus 10 %), with protein set high at 2 g per kg for holding
+      muscle. Change any of them in Settings. This is not medical advice — if you
+      have a condition that affects what you eat, take these to someone qualified.</p>
   </div>
 </section>
 
@@ -177,7 +210,13 @@
           <label>Age<input type="number" id="p-age" inputmode="numeric"></label>
           <label>Height cm<input type="number" id="p-height" inputmode="decimal"></label>
           <label>Weight kg<input type="number" id="p-weight" step="0.1" inputmode="decimal"></label>
-          <label>Activity
+          <label>Sex
+            <select id="p-sex">
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+            </select>
+          </label>
+          <label class="wide">Activity
             <select id="p-activity">
               <option value="1.2">Desk-bound</option>
               <option value="1.375">Light</option>

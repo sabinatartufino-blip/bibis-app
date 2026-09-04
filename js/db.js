@@ -201,10 +201,12 @@ const DB = (() => {
   return api;
 })();
 
-/* Targets seeded from the profile Sabina gave: 172 cm, 61.2 kg, 53 y,
-   light activity, ~10 % deficit, protein at 2.0 g/kg. All editable. */
+/* A fallback only. First run asks for age, height, weight, sex and activity
+   and overwrites both the profile and the targets before the app is used, and
+   an existing install carries its own saved values. Everything stays editable
+   in Settings afterwards. */
 const DEFAULT_SETTINGS = {
-  profile: { age: 53, height: 172, weight: 61.2, activity: 1.375 },
+  profile: { age: 53, height: 172, weight: 61.2, sex: 'female', activity: 1.375 },
   deficitPct: 10,
   targets: { kcal: 1550, pro: 122, car: 140, fat: 55, fib: 28 },
   aiProvider: 'gemini',
