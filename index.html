@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#31471B" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14170F" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bibi's App">
+<title>Bibi's App</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- The opening screen. Held from the first paint until the database is open
+     and the day has rendered, with a floor of ~1.1 s so it reads as an
+     opening rather than a flicker, then faded out by boot(). -->
+<div class="veil" id="boot-veil">
+  <div class="veil-inner">
+    <img src="icons/icon-512.png" alt="" width="512" height="512">
+    <div class="veil-name">Bibi&rsquo;s <em>App</em></div>
+  </div>
+</div>
+
+<!-- First run only. -->
+<section class="welcome" id="welcome" hidden>
+  <div class="welcome-inner">
+    <!-- The logo carries the name and the tagline, so neither is repeated as
+         text below it. The heading stays for screen readers. -->
+    <img class="welcome-hero" src="icons/icon-512.png" alt="" width="512" height="512">
+    <h1 class="sr-only">Bibi&rsquo;s App — healthy food, happier you</h1>
+
+    <ul class="welcome-points">
+      <li>
+        <b>Scan it, photograph it, or type it</b>
+        A barcode goes to Open Food Facts. A photo of the nutrition table gets read for you —
+        including whether the label counts per 100 g or per serving. Typing always works.
+      </li>
+      <li>
+        <b>Save a meal once, log it in one tap</b>
+        Your morning bowl is eleven ingredients. You enter that once, not every morning.
+      </li>
+      <li>
+        <b>Nothing leaves this phone</b>
+        No account, no server, no analytics. Export a backup now and then — it is the only copy.
+      </li>
+    </ul>
+
+    <div class="welcome-actions">
+      <button class="btn primary" id="welcome-go">
+        Start with my plan
+        <small>18 ingredients · Morning bowl · Afternoon shake</small>
+      </button>
+      <button class="link-btn" id="welcome-empty">or start with an empty library</button>
+    </div>
+
+    <p class="welcome-fine">Three items — the whey, the Zene sauce and the coconut milk —
+      carry estimated values and are tagged <b>CHECK</b> until you compare them to the pack.</p>
+  </div>
+</section>
+
+<div id="app">
+
+  <!-- ============ TODAY ============ -->
+  <section class="view" id="view-today">
+    <header class="bar">
+      <button class="icon-btn" id="day-prev" aria-label="Previous day">‹</button>
+      <div class="bar-title">
+        <h1 id="day-label">Today</h1>
+        <span class="bar-sub" id="day-date"></span>
+      </div>
+      <button class="icon-btn" id="day-next" aria-label="Next day">›</button>
+    </header>
+
+    <div class="scroll">
+      <div class="rings" id="rings"></div>
+
+      <div class="slots" id="slots"></div>
+
+      <div class="block">
+        <div class="block-head">
+          <h2>Body weight</h2>
+          <button class="link-btn" id="weight-add">Log</button>
+        </div>
+        <div class="weight-line" id="weight-line"></div>
+      </div>
+
+      <div class="pad-bottom"></div>
+    </div>
+
+    <button class="fab" id="fab-add" aria-label="Add food">+</button>
+  </section>
+
+  <!-- ============ LIBRARY ============ -->
+  <section class="view" id="view-library" hidden>
+    <header class="bar">
+      <div class="bar-title"><h1>Library</h1><span class="bar-sub" id="lib-count"></span></div>
+      <button class="icon-btn" id="lib-new" aria-label="New ingredient">+</button>
+    </header>
+    <div class="search-wrap">
+      <input type="search" id="lib-search" placeholder="Search ingredients and meals" autocomplete="off">
+    </div>
+    <div class="seg" id="lib-seg">
+      <button class="seg-btn is-on" data-tab="ing">Ingredients</button>
+      <button class="seg-btn" data-tab="rec">Saved meals</button>
+    </div>
+    <div class="scroll">
+      <div id="lib-list" class="list"></div>
+      <div class="pad-bottom"></div>
+    </div>
+  </section>
+
+  <!-- ============ TRENDS ============ -->
+  <section class="view" id="view-trends" hidden>
+    <header class="bar"><div class="bar-title"><h1>Trends</h1><span class="bar-sub">Last 14 days</span></div></header>
+    <div class="scroll">
+      <div class="block">
+        <div class="block-head"><h2>Energy vs target</h2><span class="block-note" id="tr-kcal-avg"></span></div>
+        <div id="chart-kcal" class="chart"></div>
+      </div>
+      <div class="block">
+        <div class="block-head"><h2>Protein vs target</h2><span class="block-note" id="tr-pro-avg"></span></div>
+        <div id="chart-pro" class="chart"></div>
+      </div>
+      <div class="block">
+        <div class="block-head"><h2>Body weight</h2><span class="block-note" id="tr-wt-note"></span></div>
+        <div id="chart-wt" class="chart"></div>
+      </div>
+      <div class="pad-bottom"></div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section class="view" id="view-settings" hidden>
+    <header class="bar"><div class="bar-title"><h1>Settings</h1></div></header>
+    <div class="scroll">
+
+      <div class="block">
+        <div class="block-head"><h2>Profile</h2></div>
+        <div class="form-grid">
+          <label>Age<input type="number" id="p-age" inputmode="numeric"></label>
+          <label>Height cm<input type="number" id="p-height" inputmode="decimal"></label>
+          <label>Weight kg<input type="number" id="p-weight" step="0.1" inputmode="decimal"></label>
+          <label>Activity
+            <select id="p-activity">
+              <option value="1.2">Desk-bound</option>
+              <option value="1.375">Light</option>
+              <option value="1.55">Moderate</option>
+              <option value="1.725">Active</option>
+            </select>
+          </label>
+        </div>
+        <div class="derived" id="p-derived"></div>
+      </div>
+
+      <div class="block">
+        <div class="block-head">
+          <h2>Daily targets</h2>
+          <button class="link-btn" id="t-suggest">Recalculate</button>
+        </div>
+        <div class="form-grid">
+          <label>Energy kcal<input type="number" id="t-kcal" inputmode="numeric"></label>
+          <label>Protein g<input type="number" id="t-pro" inputmode="numeric"></label>
+          <label>Carbs g<input type="number" id="t-car" inputmode="numeric"></label>
+          <label>Fat g<input type="number" id="t-fat" inputmode="numeric"></label>
+          <label>Fiber g<input type="number" id="t-fib" inputmode="numeric"></label>
+          <label>Deficit %<input type="number" id="t-def" inputmode="numeric"></label>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="block-head"><h2>Label reading</h2></div>
+        <p class="block-body">Photographing a nutrition label sends that one image to a vision model, which returns the values and the basis they apply to. Your key is stored only on this phone and never leaves it except to call the API you chose.</p>
+        <div class="form-grid">
+          <label class="wide">Provider
+            <select id="ai-provider">
+              <option value="gemini">Google Gemini (free tier)</option>
+              <option value="anthropic">Anthropic Claude</option>
+              <option value="none">Off — type values by hand</option>
+            </select>
+          </label>
+          <label class="wide">API key<input type="password" id="ai-key" placeholder="Paste key" autocomplete="off"></label>
+          <label class="wide">Model<input type="text" id="ai-model" autocomplete="off" spellcheck="false"></label>
+        </div>
+        <button class="btn" id="ai-test">Test the connection</button>
+        <div class="derived" id="ai-status"></div>
+      </div>
+
+      <div class="block">
+        <div class="block-head"><h2>Your data</h2></div>
+        <p class="block-body">Everything lives in this browser's storage on this phone. Nothing is uploaded, so a backup is the only copy that survives a lost phone — export now and then.</p>
+        <div class="btn-row">
+          <button class="btn" id="d-export">Export backup</button>
+          <button class="btn" id="d-import">Restore backup</button>
+          <input type="file" id="d-file" accept="application/json" hidden>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="d-csv">Export log as CSV</button>
+          <button class="btn danger" id="d-wipe">Erase everything</button>
+        </div>
+        <div class="derived" id="d-status"></div>
+      </div>
+
+      <div class="block">
+        <div class="brand-row">
+          <img src="icons/mark-128.png" alt="Bibi's App">
+          <div>
+            <div class="brand-name">Bibi's <em>App</em></div>
+            <div class="brand-tag">Healthy food · Happier you</div>
+          </div>
+        </div>
+        <p class="block-body">Version <span id="about-ver"></span> — a tracker for one person. No account, no server, no analytics. Values you enter off a package are yours; values from Open Food Facts come from a community database and are worth a glance before you trust them.</p>
+      </div>
+
+      <div class="pad-bottom"></div>
+    </div>
+  </section>
+
+  <!-- ============ TAB BAR ============ -->
+  <nav class="tabs" id="tabs">
+    <button class="tab is-on" data-view="today"><span class="tab-ico">◉</span>Today</button>
+    <button class="tab" data-view="library"><span class="tab-ico">▤</span>Library</button>
+    <button class="tab" data-view="trends"><span class="tab-ico">◫</span>Trends</button>
+    <button class="tab" data-view="settings"><span class="tab-ico">⚙</span>Settings</button>
+  </nav>
+</div>
+
+<!-- ============ SHEETS ============ -->
+<div class="sheet-host" id="sheet-host" hidden>
+  <div class="sheet-backdrop" id="sheet-backdrop"></div>
+
+  <!-- add: choose a method -->
+  <div class="sheet" id="sheet-add" hidden>
+    <div class="sheet-head"><h2>Add to <span id="add-slot-name">the day</span></h2><button class="icon-btn" data-close>✕</button></div>
+    <div class="sheet-body">
+      <div class="search-wrap tight">
+        <input type="search" id="add-search" placeholder="Search your library" autocomplete="off">
+      </div>
+      <div id="add-results" class="list compact"></div>
+      <div class="method-row">
+        <button class="method" id="m-barcode"><b>Scan barcode</b><span>Looks the product up in Open Food Facts</span></button>
+        <button class="method" id="m-photo"><b>Photograph the label</b><span>Reads the values off the nutrition table</span></button>
+        <button class="method" id="m-manual"><b>Type it in</b><span>Enter the numbers yourself</span></button>
+      </div>
+      <input type="file" id="photo-input" accept="image/*" capture="environment" hidden>
+    </div>
+  </div>
+
+  <!-- scan -->
+  <div class="sheet" id="sheet-scan" hidden>
+    <div class="sheet-head"><h2>Scan a barcode</h2><button class="icon-btn" data-close>✕</button></div>
+    <div class="sheet-body">
+      <div class="cam-wrap"><video id="cam" playsinline muted></video><div class="cam-reticle"></div></div>
+      <div class="derived" id="scan-status">Point the camera at the barcode.</div>
+      <label class="wide manual-code">Or type the number
+        <input type="text" id="scan-manual" inputmode="numeric" placeholder="e.g. 7610200401234">
+      </label>
+      <button class="btn primary" id="scan-lookup">Look it up</button>
+    </div>
+  </div>
+
+  <!-- review / edit an ingredient -->
+  <div class="sheet" id="sheet-review" hidden>
+    <div class="sheet-head"><h2 id="review-title">Check the values</h2><button class="icon-btn" data-close>✕</button></div>
+    <div class="sheet-body">
+      <div class="provenance" id="review-prov" hidden></div>
+      <div class="photo-row" id="review-photos"></div>
+      <div class="form-grid">
+        <label class="wide">Name<input type="text" id="r-name" autocomplete="off"></label>
+        <label>Brand<input type="text" id="r-brand" autocomplete="off"></label>
+        <label>Barcode<input type="text" id="r-barcode" inputmode="numeric" autocomplete="off"></label>
+        <label class="hl">Label values per<input type="number" id="r-basis" inputmode="decimal" step="1"></label>
+        <label>Unit
+          <select id="r-unit"><option value="g">grams</option><option value="ml">millilitres</option></select>
+        </label>
+        <label>Energy kcal<input type="number" id="r-kcal" inputmode="decimal" step="0.1"></label>
+        <label>Protein g<input type="number" id="r-pro" inputmode="decimal" step="0.1"></label>
+        <label>Carbs g<input type="number" id="r-car" inputmode="decimal" step="0.1"></label>
+        <label>Fat g<input type="number" id="r-fat" inputmode="decimal" step="0.1"></label>
+        <label>Fiber g<input type="number" id="r-fib" inputmode="decimal" step="0.1"></label>
+      </div>
+      <div class="photo-actions">
+        <button class="btn" id="r-add-label">Attach label photo</button>
+        <button class="btn" id="r-add-front">Attach product photo</button>
+        <input type="file" id="r-photo-file" accept="image/*" capture="environment" hidden>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn danger" id="r-delete" hidden>Delete</button>
+        <button class="btn primary grow" id="r-save">Save to library</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- portion -->
+  <div class="sheet" id="sheet-portion" hidden>
+    <div class="sheet-head"><h2 id="portion-title">How much?</h2><button class="icon-btn" data-close>✕</button></div>
+    <div class="sheet-body">
+      <div class="portion-amount">
+        <input type="number" id="portion-g" inputmode="decimal" step="1">
+        <span id="portion-unit">g</span>
+      </div>
+      <div class="chip-row" id="portion-chips"></div>
+      <div class="portion-preview" id="portion-preview"></div>
+      <div class="sheet-actions">
+        <button class="btn" id="portion-edit">Edit ingredient</button>
+        <button class="btn primary grow" id="portion-save">Add to the day</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- recipe builder -->
+  <div class="sheet" id="sheet-recipe" hidden>
+    <div class="sheet-head"><h2 id="recipe-title">Saved meal</h2><button class="icon-btn" data-close>✕</button></div>
+    <div class="sheet-body">
+      <label class="wide">Name<input type="text" id="rc-name" autocomplete="off"></label>
+      <div id="rc-items" class="list compact"></div>
+      <button class="btn" id="rc-add-item">Add an ingredient</button>
+      <div class="portion-preview" id="rc-preview"></div>
+      <div class="sheet-actions">
+        <button class="btn danger" id="rc-delete" hidden>Delete</button>
+        <button class="btn primary grow" id="rc-save">Save meal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- weight -->
+  <div class="sheet" id="sheet-weight" hidden>
+    <div class="sheet-head"><h2>Log body weight</h2><button class="icon-btn" data-close>✕</button></div>
+    <div class="sheet-body">
+      <div class="form-grid">
+        <label>Weight kg<input type="number" id="w-kg" step="0.1" inputmode="decimal"></label>
+        <label>Date<input type="date" id="w-date"></label>
+      </div>
+      <div class="sheet-actions"><button class="btn primary grow" id="w-save">Save</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<div class="busy" id="busy" hidden><div class="spinner"></div><span id="busy-text">Working…</span></div>
+
+<script src="js/db.js"></script>
+<script src="js/calc.js"></script>
+<script src="js/vision.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
