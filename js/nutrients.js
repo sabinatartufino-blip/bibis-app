@@ -164,7 +164,11 @@ const Nut = {
 
   /* Sodium and salt are the same fact in two units; fill whichever is
      missing so a label that gives one still shows both.
-     1 g salt = 393.4 mg sodium (NaCl molar mass). */
+
+     The factor is 2.5, which is what EU labelling rules prescribe
+     (salt = sodium × 2.5, so 1 g salt = 400 mg sodium). The true molar
+     ratio is 393.4 mg per gram — using it here would put this app 1.7 %
+     out of step with every label it reads, so the regulatory factor wins. */
   deriveSalt(n) {
     if (n.na !== undefined && n.salt === undefined) n.salt = n.na * 2.5 / 1000;
     else if (n.salt !== undefined && n.na === undefined) n.na = n.salt * 1000 / 2.5;

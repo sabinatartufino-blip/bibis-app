@@ -8,7 +8,7 @@
    Bump CACHE when you change any shell file, or phones keep the old one.
    ============================================================ */
 
-const CACHE = 'bibis-app-v4';
+const CACHE = 'bibis-app-v6';
 
 const SHELL = [
   './',

@@ -273,12 +273,14 @@
 
   <!-- add: choose a method -->
   <div class="sheet" id="sheet-add" hidden>
-    <div class="sheet-head"><h2>Add to <span id="add-slot-name">the day</span></h2><button class="icon-btn" data-close>✕</button></div>
+    <div class="sheet-head"><h2 id="add-title">Add to the day</h2><button class="icon-btn" data-close>✕</button></div>
     <div class="sheet-body">
-      <div class="search-wrap tight">
-        <input type="search" id="add-search" placeholder="Search your library" autocomplete="off">
+      <div id="add-existing">
+        <div class="search-wrap tight">
+          <input type="search" id="add-search" placeholder="Search your library" autocomplete="off">
+        </div>
+        <div id="add-results" class="list compact"></div>
       </div>
-      <div id="add-results" class="list compact"></div>
       <div class="method-row">
         <button class="method" id="m-barcode"><b>Scan barcode</b><span>Looks the product up in Open Food Facts</span></button>
         <button class="method" id="m-photo"><b>Photograph the label</b><span>Reads the values off the nutrition table</span></button>

@@ -237,17 +237,43 @@ const Vision = (() => {
     const q = String(query || '').trim();
     if (q.length < 2) throw new Error('Type at least two letters.');
 
-    if ((settings.usdaKey || '').trim()) {
-      try { return await searchUsda(q, settings.usdaKey.trim()); }
-      catch (e) { if (e.badKey) throw e; /* otherwise fall through */ }
+    /* Whatever goes wrong with the preferred source, keep going to the next
+       one — a broken key should cost you the better data, not the search.
+       The reason is carried out on `_warn` so the UI can still say so. */
+    let warn = '';
+
+    if (cleanKey(settings.usdaKey)) {
+      try {
+        return await searchUsda(q, settings.usdaKey);
+      } catch (e) {
+        warn = e.message;
+      }
     }
+
     if (settings.aiProvider !== 'none' && (settings.aiKey || '').trim()) {
-      return await searchViaModel(q, settings);
+      try {
+        const rows = await searchViaModel(q, settings);
+        if (warn) rows._warn = warn;
+        return rows;
+      } catch (e) {
+        warn = warn ? warn + ' ' + e.message : e.message;
+      }
     }
-    return await searchOff(q);
+
+    const rows = await searchOff(q);
+    if (warn) rows._warn = warn;
+    return rows;
   }
 
-  async function searchUsda(q, key) {
+  /* api.data.gov keys are 40 alphanumeric characters. A paste on a phone
+     picks up spaces, newlines and the odd zero-width character, all of
+     which produce a 403 that looks exactly like a wrong key. */
+  function cleanKey(key) {
+    return String(key || '').replace(/[^A-Za-z0-9]/g, '');
+  }
+
+  async function searchUsda(q, rawKey) {
+    const key = cleanKey(rawKey);
     const url = 'https://api.nal.usda.gov/fdc/v1/foods/search?' + new URLSearchParams({
       query: q,
       dataType: 'Foundation,SR Legacy',
@@ -255,12 +281,40 @@ const Vision = (() => {
       api_key: key
     });
     const res = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (res.status === 401 || res.status === 403) {
-      const err = new Error('The USDA key was rejected — check it under Settings.');
-      err.badKey = true;
-      throw err;
+
+    if (!res.ok) {
+      /* api.data.gov sits in front of the USDA API and returns 403 for
+         several different reasons. Only some of them are the key's fault,
+         and only those should stop the search rather than falling through
+         to the next source. */
+      let code = '';
+      let message = '';
+      try {
+        const body = await res.json();
+        const e = body && (body.error || body);
+        code = String((e && e.code) || '').toUpperCase();
+        message = String((e && e.message) || '');
+      } catch (e) { /* not JSON */ }
+
+      if (code === 'OVER_RATE_LIMIT' || res.status === 429) {
+        throw new Error('USDA rate limit reached — an hour’s worth of lookups. It resets shortly; the model answers in the meantime.');
+      }
+      if (code === 'API_KEY_MISSING' || !key) {
+        const err = new Error('No USDA key was sent. Paste it again under Settings.');
+        err.badKey = true;
+        throw err;
+      }
+      if (res.status === 401 || res.status === 403) {
+        const err = new Error('USDA rejected the key (' + (code || res.status) + '). ' +
+          'It is ' + key.length + ' characters' +
+          (key.length !== 40 ? ' — theirs are 40, so the paste looks incomplete' : '') +
+          '.' + (message ? ' They said: ' + message : ''));
+        err.badKey = true;
+        throw err;
+      }
+      throw new Error('USDA replied ' + res.status + '.' + (message ? ' ' + message : ''));
     }
-    if (!res.ok) throw new Error('USDA replied ' + res.status + '.');
+
     const json = await res.json();
     const foods = (json && json.foods) || [];
     if (!foods.length) throw new Error('Nothing in USDA matches "' + q + '".');
@@ -419,8 +473,12 @@ const Vision = (() => {
   }
 
   async function testUsda(key) {
-    const rows = await searchUsda('kiwifruit', String(key || '').trim());
-    return rows.length;
+    const clean = cleanKey(key);
+    const rows = await searchUsda('kiwifruit', clean);
+    const extras = rows.length
+      ? Object.keys(rows[0].n || {}).filter((k) => CORE.indexOf(k) < 0).length
+      : 0;
+    return { matches: rows.length, keyLength: clean.length, extras };
   }
 
   /* ---------- tier 2: vision model ---------- */

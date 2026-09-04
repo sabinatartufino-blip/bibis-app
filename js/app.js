@@ -2,7 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 
 /* How long the opening screen is guaranteed to stay up. Below roughly a
    second a splash reads as a glitch; much above it and you are just making
@@ -21,6 +21,7 @@ const S = {
   weights: [],
   libTab: 'ing',
   addSlot: 'morning',
+  addMode: 'log',
   draft: null,       // ingredient being reviewed/edited
   draftPhotos: {},   // {labelPhoto, frontPhoto} pending blobs
   photoTarget: null,
@@ -416,11 +417,25 @@ function bindAdd() {
   });
 }
 
+/* Two intents, one sheet. From Today you are logging something you ate, so
+   saving an ingredient continues to the portion step. From Library you are
+   cataloguing a product for later, so saving stops there. */
 function openAdd(slot) {
+  S.addMode = 'log';
   S.addSlot = slot;
-  $('add-slot-name').textContent = (SLOTS.find((s) => s.id === slot) || { name: 'the day' }).name.toLowerCase();
+  const name = (SLOTS.find((s) => s.id === slot) || { name: 'the day' }).name.toLowerCase();
+  $('add-title').textContent = 'Add to ' + name;
+  $('add-existing').hidden = false;
   $('add-search').value = '';
   renderAddResults();
+  openSheet('add');
+}
+
+function openAddToLibrary() {
+  S.addMode = 'library';
+  $('add-title').textContent = 'New ingredient';
+  /* No point searching the library for something you are adding to it. */
+  $('add-existing').hidden = true;
   openSheet('add');
 }
 
@@ -533,8 +548,13 @@ async function doLookup(code) {
     const existing = await DB.byIndex('ingredients', 'barcode', String(code).replace(/\D/g, ''));
     if (existing && existing.length) {
       busy(false);
-      toast('Already in your library');
-      openPortion('ing', existing[0]);
+      if (S.addMode === 'library') {
+        toast('Already in your library — opening it');
+        openReview(existing[0], { isNew: false });
+      } else {
+        toast('Already in your library');
+        openPortion('ing', existing[0]);
+      }
       return;
     }
     const draft = await Vision.lookupBarcode(code);
@@ -796,9 +816,10 @@ async function runNameSearch() {
     const results = await Vision.searchByName(q, S.settings);
     S.nameResults = results;
     busy(false);
-    $('nm-status').textContent = results.length === 1
+    const base = results.length === 1
       ? 'One match. Tap it to check the values.'
       : results.length + ' matches. Tap the closest one — you can still edit every value.';
+    $('nm-status').textContent = results._warn ? base + ' ⚠ ' + results._warn : base;
     results.forEach((r, i) => {
       const row = el('button', 'row');
       row.dataset.i = i;
@@ -923,8 +944,14 @@ async function saveReview() {
   S.draft = null;
   S.draftPhotos = {};
 
-  if (wasNew) openPortion('ing', S.ings.get(ing.id));
-  else { closeSheets(); renderToday(); renderLibrary(); toast('Saved'); }
+  if (wasNew && S.addMode !== 'library') {
+    openPortion('ing', S.ings.get(ing.id));
+  } else {
+    closeSheets();
+    renderToday();
+    renderLibrary();
+    toast(wasNew ? 'Added to your library' : 'Saved');
+  }
 }
 
 async function deleteIngredient() {
@@ -1102,10 +1129,7 @@ function bindLibrary() {
   });
   $('lib-new').addEventListener('click', () => {
     if (S.libTab === 'rec') openRecipe(null);
-    else openReview({
-      name: '', brand: '', barcode: '', basis: 100, unit: 'g',
-      kcal: 0, pro: 0, car: 0, fat: 0, fib: 0, source: 'manual'
-    }, { isNew: true });
+    else openAddToLibrary();
   });
   $('lib-list').addEventListener('click', (e) => {
     const row = e.target.closest('.row');
@@ -1450,8 +1474,11 @@ function bindSettings() {
   });
 
   $('usda-key').addEventListener('change', async () => {
-    S.settings = await DB.saveSettings({ usdaKey: $('usda-key').value.trim() });
-    $('usda-status').textContent = 'Saved on this phone.';
+    const cleaned = $('usda-key').value.replace(/[^A-Za-z0-9]/g, '');
+    $('usda-key').value = cleaned;
+    S.settings = await DB.saveSettings({ usdaKey: cleaned });
+    $('usda-status').textContent = 'Saved on this phone — ' + cleaned.length +
+      ' characters' + (cleaned.length && cleaned.length !== 40 ? ' (theirs are 40)' : '') + '.';
   });
 
   $('usda-test').addEventListener('click', async () => {
@@ -1459,8 +1486,9 @@ function bindSettings() {
     if (!(S.settings.usdaKey || '').trim()) { st.textContent = 'Paste a key first.'; return; }
     st.textContent = 'Testing…';
     try {
-      const n = await Vision.testUsda(S.settings.usdaKey);
-      st.textContent = '✓ Works — "kiwifruit" returned ' + n + ' matches.';
+      const r = await Vision.testUsda(S.settings.usdaKey);
+      st.textContent = '✓ Works — "kiwifruit" returned ' + r.matches + ' matches with ' +
+        r.extras + ' vitamins and minerals each. Key is ' + r.keyLength + ' characters.';
     } catch (e) {
       st.textContent = '✕ ' + e.message;
     }
