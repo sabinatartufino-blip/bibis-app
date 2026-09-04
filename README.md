@@ -170,6 +170,16 @@ file is a few KB; with them it can run to megabytes.
 Saved meals are deliberately left out. A meal is a list of ingredient ids that exist only
 on the phone that made it, so it would arrive pointing at nothing.
 
+The file is saved as **`.txt`**, not `.json`, even though JSON is what is inside it.
+WhatsApp's document allowlist covers `text/plain` but not `application/json`, so a `.json`
+attachment is simply refused. The importer reads what is inside the file and ignores the
+extension, so nothing else changes.
+
+If a messaging app still will not carry the file, send it as text: **Copy as text** puts the
+whole list on the clipboard (a typical 18-ingredient library is about 3.5 thousand
+characters, which fits in an ordinary chat message), and the other person uses **Paste a
+list**. No file has to travel at all.
+
 The other person opens **Settings › Share your ingredients › Import ingredients** and picks
 the file. Importing only ever **adds**: nothing already in their library is changed or
 removed, and anything they already have under the same name and brand is skipped — so

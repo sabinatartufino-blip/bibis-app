@@ -2,7 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '2.10.0';
+const APP_VERSION = '2.11.0';
 
 const S = {
   view: 'today',
@@ -1946,10 +1946,14 @@ function bindSettings() {
     try {
       const data = await DB.exportIngredients(withPhotos);
       const json = JSON.stringify(data);
-      download(json, 'bibis-app-ingredients-' + Calc.today() + '.json', 'application/json');
+      /* Saved as .txt, not .json. WhatsApp's document allowlist covers
+         text/plain but not application/json, so a .json attachment is simply
+         refused. The contents are unchanged — the importer reads what is
+         inside the file, never its extension. */
+      download(json, 'bibis-app-ingredients-' + Calc.today() + '.txt', 'text/plain');
       $('d-ing-status').textContent = 'Exported ' + data.ingredients.length + ' ingredients' +
         (withPhotos ? ' with photos' : ', values only') +
-        ' — ' + Math.max(1, Math.round(json.length / 1024)) + ' KB. Nothing personal is in this file.';
+        ' — ' + Math.max(1, Math.round(json.length / 1024)) + ' KB, saved as .txt so messaging apps will carry it. Nothing personal is in this file.';
     } catch (e) { toast(e.message, 4500); }
     busy(false);
   });
@@ -1959,29 +1963,46 @@ function bindSettings() {
     const file = ev.target.files && ev.target.files[0];
     if (!file) return;
     busy(true, 'Reading the list…');
-    try {
-      const data = JSON.parse(await file.text());
-      /* Say what is about to happen, with the real count, before touching
-         anything — an import that only ever adds is still someone else's data
-         arriving in your library. */
-      const count = (data.ingredients || []).length;
-      busy(false);
-      if (data.format !== 'bibis-app-ingredients') {
-        throw new Error('That file is not an ingredient list. A full backup goes through Restore backup above.');
-      }
-      if (!confirm('Add ' + count + ' ingredient' + (count === 1 ? '' : 's') +
-        ' to your library?\n\nNothing you already have is changed or removed. Duplicates by name and brand are skipped.')) return;
-      busy(true, 'Adding to your library…');
-      const r = await DB.importIngredients(data);
-      await reload();
-      renderAll();
-      if (S.view === 'library') renderLibrary();
-      $('d-ing-status').textContent = 'Added ' + r.added +
-        (r.skipped ? ', skipped ' + r.skipped + ' you already had' : '') +
-        ' — tagged SHARED in your Library.';
-      toast('Added ' + r.added + ' ingredient' + (r.added === 1 ? '' : 's'), 3600);
-    } catch (e) { toast(e.message, 5000); }
+    let text = '';
+    try { text = await file.text(); } catch (e) { busy(false); toast('Could not read that file', 4000); return; }
     busy(false);
+    await addSharedList(text);
+  });
+
+  /* Text is the fallback that always works. A messaging app that refuses a
+     file attachment will still carry a few KB of characters in the message
+     body, and pasting sidesteps the download-then-find-it dance on a phone. */
+  $('d-ing-copy').addEventListener('click', async () => {
+    if (!S.ings.size) { toast('Your library is empty — nothing to send'); return; }
+    busy(true, 'Preparing the text…');
+    try {
+      /* Never photos here: base64 images would run to megabytes of characters
+         and no chat app would carry it. */
+      const json = JSON.stringify(await DB.exportIngredients(false));
+      busy(false);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(json);
+        $('d-ing-status').textContent = 'Copied ' + S.ings.size + ' ingredients as text (' +
+          Math.max(1, Math.round(json.length / 1024)) + ' KB) — paste it into a message.';
+        toast('Copied — paste it into a chat', 3600);
+      } else {
+        toast('Could not reach the clipboard — use Export ingredients instead', 4500);
+      }
+    } catch (e) { busy(false); toast(e.message, 4500); }
+  });
+
+  $('d-ing-paste').addEventListener('click', () => {
+    $('d-ing-paste-wrap').hidden = false;
+    $('d-ing-text').value = '';
+    $('d-ing-text').focus();
+  });
+  $('d-ing-text-cancel').addEventListener('click', () => {
+    $('d-ing-paste-wrap').hidden = true;
+    $('d-ing-text').value = '';
+  });
+  $('d-ing-text-go').addEventListener('click', async () => {
+    const ok = await addSharedList($('d-ing-text').value);
+    if (ok) { $('d-ing-paste-wrap').hidden = true; $('d-ing-text').value = ''; }
   });
 
   $('d-csv').addEventListener('click', async () => {
@@ -2011,6 +2032,57 @@ function bindSettings() {
     show('today');
     $('welcome').hidden = false;   // erased means back to first run
   });
+}
+
+/* One path for both routes into the library — a file and a paste differ only
+   in where the characters came from. Returns true if anything was added, so
+   the paste box knows whether to close itself. */
+async function addSharedList(raw) {
+  const text = String(raw || '').trim();
+  if (!text) { toast('Nothing to read — paste the text first', 4000); return false; }
+
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    /* The usual cause is a half-copied message, so say that rather than
+       showing them a parser error about an unexpected token. */
+    toast('That text is incomplete or not a list from this app — copy the whole message and try again', 5500);
+    return false;
+  }
+
+  if (!data || data.format !== 'bibis-app-ingredients') {
+    toast('That is not an ingredient list. A full backup goes through Restore backup above.', 5500);
+    return false;
+  }
+
+  /* Say what is about to happen, with the real count, before touching
+     anything — an import that only ever adds is still someone else's data
+     arriving in your library. */
+  const count = (data.ingredients || []).length;
+  if (!count) { toast('That list is empty', 4000); return false; }
+  if (!confirm('Add ' + count + ' ingredient' + (count === 1 ? '' : 's') +
+    ' to your library?\n\nNothing you already have is changed or removed. Duplicates by name and brand are skipped.')) return false;
+
+  busy(true, 'Adding to your library…');
+  try {
+    const r = await DB.importIngredients(data);
+    await reload();
+    renderAll();
+    if (S.view === 'library') renderLibrary();
+    $('d-ing-status').textContent = 'Added ' + r.added +
+      (r.skipped ? ', skipped ' + r.skipped + ' you already had' : '') +
+      (r.added ? ' — tagged SHARED in your Library.' : '.');
+    toast(r.added
+      ? 'Added ' + r.added + ' ingredient' + (r.added === 1 ? '' : 's')
+      : 'You already had all of those', 3600);
+  } catch (e) {
+    toast(e.message, 5000);
+    busy(false);
+    return false;
+  }
+  busy(false);
+  return true;
 }
 
 function renderSettings() {

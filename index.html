@@ -308,12 +308,32 @@
         <div class="btn-row">
           <button class="btn" id="d-ing-export">Export ingredients</button>
           <button class="btn" id="d-ing-import">Import ingredients</button>
-          <input type="file" id="d-ing-file" accept="application/json" hidden>
+          <!-- Deliberately wide: the file is saved as .txt so WhatsApp will carry
+               it (it refuses application/json), and a recipient's phone may hand
+               it over as text/plain, application/json or nothing at all. -->
+          <input type="file" id="d-ing-file" accept=".txt,.json,text/plain,application/json" hidden>
         </div>
         <p class="block-body">Importing <b>adds</b> to your library and never removes or changes
           what is already there. Anything you already have under the same name and brand is
           skipped, so the same file can be imported twice with no duplicates.</p>
         <div class="derived" id="d-ing-status"></div>
+
+        <p class="block-body" style="margin-top:12px">Messaging apps are fussy about files. If one
+          will not carry it, send the list as <b>text</b> instead — copy it, paste it into the chat,
+          and the other person pastes it below.</p>
+        <div class="btn-row">
+          <button class="btn" id="d-ing-copy">Copy as text</button>
+          <button class="btn" id="d-ing-paste">Paste a list</button>
+        </div>
+        <div id="d-ing-paste-wrap" hidden>
+          <label class="wide" style="margin-top:10px">Paste the list here
+            <textarea id="d-ing-text" rows="4" placeholder="Paste the text you were sent…"></textarea>
+          </label>
+          <div class="btn-row">
+            <button class="btn primary" id="d-ing-text-go">Add these ingredients</button>
+            <button class="btn" id="d-ing-text-cancel">Cancel</button>
+          </div>
+        </div>
       </div>
 
       <div class="block">
