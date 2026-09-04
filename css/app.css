@@ -81,10 +81,42 @@
   --shadow-up: 0 -6px 24px -12px rgba(60,25,22,.30);
 }
 
-/* Auto dark applies only until the app stamps a theme of its own, which it
-   does on the first paint. Dark is then a choice, never a surprise. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
+/* ---------- the Shopping screen, on cream ----------
+   Sabina asked for the quieter cream ground on this one screen only; Today,
+   Library, Trends and Settings keep the pink. Custom properties inherit, so
+   re-declaring the cream tokens here re-tints everything inside the view —
+   the top bar, the text weights, the row borders — without touching any of
+   the rules that draw them.
+
+   Scoped to the pink theme on purpose. On Cream the screen already matches,
+   and on Dark a single bright panel in a dark app would read as a bug. */
+:root[data-theme="pink"] #view-shopping {
+  --bg: #F6F3EC;
+  --surface: #FFFDFA;
+  --surface-2: #EDE8DD;
+  --ink: #1E2915;
+  --muted: #66705A;
+  --faint: #98A08A;
+  --line: #E1DACC;
+  --line-strong: #C6BFAD;
+  --accent-soft: #E6EADD;
+  --brand-pink-ink: #B5544C;
+  --pro: #B5544C;
+  --shadow: 0 1px 2px rgba(40,45,25,.05), 0 10px 28px -18px rgba(40,45,25,.28);
+
+  background: var(--bg);
+}
+
+/* ---------- DARK ----------
+   Reached only by picking Dark in Settings. It is deliberately NOT tied to
+   prefers-color-scheme: the app stamps data-theme on the first paint, so a
+   system preference can never darken the app behind her back.
+
+   This block used to be written as
+     @media (prefers-color-scheme: dark) { :root:not([data-theme]) { … } }
+   which no selector could ever match once the head script stamps a theme —
+   so choosing Dark quietly fell back to the light palette. */
+  :root[data-theme="dark"] {
     --bg: #14170F;
     --surface: #1D2117;
     --surface-2: #262B1E;
@@ -116,7 +148,6 @@
     --shadow: 0 1px 2px rgba(0,0,0,.45), 0 12px 32px -20px rgba(0,0,0,.85);
     --shadow-up: 0 -8px 28px -14px rgba(0,0,0,.7);
   }
-}
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -163,7 +194,8 @@ body {
   text-overflow: ellipsis;
 }
 .bar-sub { display: block; font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: .04em; }
-#view-library .bar-title, #view-trends .bar-title, #view-settings .bar-title { text-align: left; padding-left: 4px; }
+#view-library .bar-title, #view-shopping .bar-title,
+#view-trends .bar-title, #view-settings .bar-title { text-align: left; padding-left: 4px; }
 
 .icon-btn {
   flex: 0 0 auto;
@@ -350,6 +382,61 @@ body {
 .entry-del:active { background: var(--pro-soft); color: var(--pro); }
 .empty { padding: 11px 12px; font-size: 13px; color: var(--faint); }
 
+/* ---------- shopping list ---------- */
+.shop-bar { flex: 0 0 auto; padding: 10px 12px 4px; }
+.shop-add-row { display: flex; gap: 6px; }
+.shop-add-row input {
+  flex: 1 1 auto; min-width: 0;
+  padding: 10px 12px;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+}
+/* .btn is width:100% by default, which would push the field out of the row */
+.shop-add-row .btn { flex: 0 0 auto; width: auto; padding: 11px 18px; }
+#shop-clear { margin-top: 12px; }
+
+.shop-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.shop-row:last-child { border-bottom: none; }
+/* A ticked item stays visible — it is proof you already picked it up —
+   but recedes so the eye falls on what is still missing. */
+.shop-row.is-done .shop-name { text-decoration: line-through; color: var(--faint); }
+.shop-tick {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  box-sizing: border-box;
+  background: var(--surface-2);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  color: var(--accent-ink);
+  font-size: 14px; line-height: 1;
+  cursor: pointer;
+}
+.shop-tick.on { background: var(--accent); border-color: var(--accent); }
+.shop-main { flex: 1 1 auto; min-width: 0; }
+.shop-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shop-sub { font-family: var(--mono); font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* the 🛒 that puts a Library row on the list without opening it */
+.row-cart {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border: none;
+  background: var(--surface-2);
+  border-radius: 8px;
+  font-size: 13px; line-height: 1;
+  cursor: pointer;
+}
+.row-cart:active { background: var(--accent-soft); }
+
 /* ---------- blocks ---------- */
 .block {
   margin: 16px 0 0;
@@ -456,13 +543,14 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
   height: calc(58px + var(--safe-b));
   padding-bottom: var(--safe-b);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--line);
   box-shadow: var(--shadow-up);
   z-index: 6;
 }
 .tab {
+  position: relative;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   border: none; background: none;
   font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
@@ -471,6 +559,23 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 }
 .tab-ico { font-size: 17px; line-height: 1; }
 .tab.is-on { color: var(--accent); }
+/* how many things are still to buy, readable from the tab bar */
+.tab-badge {
+  position: absolute;
+  top: 3px; left: 50%;
+  transform: translateX(6px);
+  min-width: 16px; height: 16px;
+  padding: 0 4px;
+  display: grid; place-items: center;
+  box-sizing: border-box;
+  background: var(--pro);
+  /* --pro is a dark rose on cream and a pale rose on dark, so the ink has to
+     flip with it; --accent-ink is the token that already does. */
+  color: var(--accent-ink);
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0;
+  line-height: 1;
+  border-radius: 9px;
+}
 
 /* ---------- lists ---------- */
 .list { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }

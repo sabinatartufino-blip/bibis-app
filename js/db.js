@@ -8,6 +8,7 @@
      entries      {id, date:'YYYY-MM-DD', slot, refKind, refId, name, g, unit,
                    kcal, pro, car, fat, fib, items?, created}
      weights      {date:'YYYY-MM-DD', kg}
+     shopping     {id, name, ingId|null, note, done, created}
      meta         {key, value}          -- settings live here under 'settings'
 
    Log entries store their COMPUTED macros, not a pointer to the current
@@ -17,7 +18,7 @@
 
 const DB = (() => {
   const NAME = 'bibis-app';
-  const VERSION = 1;
+  const VERSION = 2;
   let dbp = null;
 
   function open() {
@@ -43,6 +44,11 @@ const DB = (() => {
         }
         if (!db.objectStoreNames.contains('meta')) {
           db.createObjectStore('meta', { keyPath: 'key' });
+        }
+        /* v2: the shopping list. Guarded like the rest, so upgrading an
+           existing database adds this store and touches nothing else. */
+        if (!db.objectStoreNames.contains('shopping')) {
+          db.createObjectStore('shopping', { keyPath: 'id' });
         }
         void e;
       };
@@ -103,9 +109,9 @@ const DB = (() => {
 
     /* ---------- backup ---------- */
     async exportAll(includePhotos) {
-      const [ingredients, recipes, entries, weights, settings] = await Promise.all([
+      const [ingredients, recipes, entries, weights, shopping, settings] = await Promise.all([
         api.all('ingredients'), api.all('recipes'), api.all('entries'),
-        api.all('weights'), api.settings()
+        api.all('weights'), api.all('shopping'), api.settings()
       ]);
       const safeSettings = Object.assign({}, settings);
       delete safeSettings.aiKey;   // never write a key into a file that gets emailed around
@@ -129,7 +135,7 @@ const DB = (() => {
         photos: !!includePhotos,
         settings: safeSettings,
         ingredients: ings,
-        recipes, entries, weights
+        recipes, entries, weights, shopping
       };
     },
 
@@ -140,7 +146,7 @@ const DB = (() => {
       if (mode === 'replace') {
         await Promise.all([
           api.clear('ingredients'), api.clear('recipes'),
-          api.clear('entries'), api.clear('weights')
+          api.clear('entries'), api.clear('weights'), api.clear('shopping')
         ]);
       }
       for (const i of data.ingredients || []) {
@@ -152,6 +158,7 @@ const DB = (() => {
       for (const r of data.recipes || []) await api.put('recipes', r);
       for (const e of data.entries || []) await api.put('entries', e);
       for (const w of data.weights || []) await api.put('weights', w);
+      for (const sh of data.shopping || []) await api.put('shopping', sh);
       if (data.settings) {
         const keep = Object.assign({}, data.settings);
         delete keep.aiKey;
@@ -162,14 +169,16 @@ const DB = (() => {
         ingredients: (data.ingredients || []).length,
         recipes: (data.recipes || []).length,
         entries: (data.entries || []).length,
-        weights: (data.weights || []).length
+        weights: (data.weights || []).length,
+        shopping: (data.shopping || []).length
       };
     },
 
     async wipe() {
       await Promise.all([
         api.clear('ingredients'), api.clear('recipes'),
-        api.clear('entries'), api.clear('weights'), api.clear('meta')
+        api.clear('entries'), api.clear('weights'),
+        api.clear('shopping'), api.clear('meta')
       ]);
     }
   };

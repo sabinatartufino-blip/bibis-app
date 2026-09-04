@@ -2,7 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '2.7.0';
+const APP_VERSION = '2.8.0';
 
 const S = {
   view: 'today',
@@ -12,6 +12,7 @@ const S = {
   recipes: [],
   entries: [],
   weights: [],
+  shopping: [],
   libTab: 'ing',
   addSlot: 'morning',
   addMode: 'log',
@@ -65,6 +66,7 @@ async function boot() {
   bindWelcome();
   bindNameSearch();
   bindFull();
+  bindShopping();
   renderAll();
   if (!S.settings.welcomed) $('welcome').hidden = false;
   armSplash();
@@ -122,12 +124,15 @@ function bindWelcome() {
 }
 
 async function reload() {
-  const [ings, recipes, weights] = await Promise.all([
-    DB.all('ingredients'), DB.all('recipes'), DB.all('weights')
+  const [ings, recipes, weights, shopping] = await Promise.all([
+    DB.all('ingredients'), DB.all('recipes'), DB.all('weights'), DB.all('shopping')
   ]);
   S.ings = new Map(ings.map((i) => [i.id, i]));
   S.recipes = recipes.sort((a, b) => a.name.localeCompare(b.name));
   S.weights = weights.sort((a, b) => a.date.localeCompare(b.date));
+  /* unticked first, then newest — the list you shop from, not a history */
+  S.shopping = shopping.sort((a, b) =>
+    (a.done === b.done) ? (b.created || 0) - (a.created || 0) : (a.done ? 1 : -1));
   S.entries = await DB.entriesForDate(S.date);
   S.entries.sort((a, b) => (a.created || 0) - (b.created || 0));
 }
@@ -228,15 +233,27 @@ function bindNav() {
 
 function show(view) {
   S.view = view;
-  ['today', 'library', 'trends', 'settings'].forEach((v) => {
+  ['today', 'library', 'shopping', 'trends', 'settings'].forEach((v) => {
     $('view-' + v).hidden = v !== view;
   });
   Array.from($('tabs').children).forEach((b) => {
     b.classList.toggle('is-on', b.dataset.view === view);
   });
   if (view === 'library') renderLibrary();
+  if (view === 'shopping') renderShopping();
   if (view === 'trends') renderTrends();
   if (view === 'settings') renderSettings();
+}
+
+/* The count on the Shop tab, so a list you added to from the Library is
+   visible without going looking for it. Kept out of renderShopping so it
+   stays right whichever screen you are on. */
+function renderShopBadge() {
+  const n = S.shopping.filter((x) => !x.done).length;
+  const b = $('shop-badge');
+  if (!b) return;
+  b.textContent = n > 99 ? '99+' : String(n);
+  b.hidden = n === 0;
 }
 
 let toastTimer = null;
@@ -309,7 +326,7 @@ async function changeDay(delta) {
   renderToday();
 }
 
-function renderAll() { renderToday(); }
+function renderAll() { renderToday(); renderShopBadge(); }
 
 function renderToday() {
   $('day-label').textContent = Calc.dayName(S.date);
@@ -552,7 +569,13 @@ function ingRow(i, editable) {
 
   /* In Library the row opens the editor, so say so. Without this the row
      looks like a read-only list entry and the editor stays undiscovered. */
-  if (editable) row.appendChild(el('span', 'row-edit', '✎'));
+  if (editable) {
+    const cart = el('span', 'row-cart', '🛒');
+    cart.dataset.shop = i.id;
+    cart.title = 'Add to shopping list';
+    row.appendChild(cart);
+    row.appendChild(el('span', 'row-edit', '✎'));
+  }
   return row;
 }
 
@@ -924,6 +947,12 @@ async function runNameSearch() {
 function bindReview() {
   $('r-save').addEventListener('click', saveReview);
   $('r-delete').addEventListener('click', deleteIngredient);
+  $('r-shop').addEventListener('click', () => {
+    const name = ($('r-name').value || '').trim();
+    if (!name) { toast('Give it a name first'); return; }
+    addToShopping(name, S.draft && S.draft.id ? S.draft.id : null);
+  });
+
   $('r-add-label').addEventListener('click', () => { S.photoTarget = 'labelPhoto'; $('r-photo-file').value = ''; $('r-photo-file').click(); });
   $('r-add-front').addEventListener('click', () => { S.photoTarget = 'frontPhoto'; $('r-photo-file').value = ''; $('r-photo-file').click(); });
   $('r-photo-file').addEventListener('change', async (ev) => {
@@ -1236,6 +1265,14 @@ function bindLibrary() {
     else openAddToLibrary();
   });
   $('lib-list').addEventListener('click', (e) => {
+    /* the cart icon must not also open the editor */
+    const cart = e.target.closest('[data-shop]');
+    if (cart) {
+      e.stopPropagation();
+      const ing = S.ings.get(cart.dataset.shop);
+      if (ing) addToShopping(ing.name, ing.id);
+      return;
+    }
     const row = e.target.closest('.row');
     if (!row) return;
     if (row.dataset.kind === 'ing') openReview(S.ings.get(row.dataset.id), { isNew: false });
@@ -1274,6 +1311,140 @@ function renderLibrary() {
   $('lib-count').textContent = all.length + ' INGREDIENTS' + (toCheck ? ' · ' + toCheck + ' TO CHECK' : '');
   list.forEach((i) => host.appendChild(ingRow(i, true)));
   if (!list.length) host.appendChild(el('div', 'empty', 'Nothing matches.'));
+}
+
+/* ============================================================
+   SHOPPING LIST
+   ============================================================ */
+
+function bindShopping() {
+  $('shop-add').addEventListener('click', addTypedShopItem);
+  $('shop-new').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addTypedShopItem();
+  });
+
+  $('shop-copy').addEventListener('click', () => {
+    const open = S.shopping.filter((x) => !x.done);
+    if (!open.length) { toast('Nothing left to buy'); return; }
+    const text = open.map((x) => '- ' + x.name + (x.note ? ' (' + x.note + ')' : '')).join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        () => toast('List copied — paste it anywhere'),
+        () => toast('Could not reach the clipboard')
+      );
+    } else toast('Could not reach the clipboard');
+  });
+
+  $('shop-clear').addEventListener('click', async () => {
+    const ticked = S.shopping.filter((x) => x.done);
+    if (!ticked.length) { toast('Nothing ticked'); return; }
+    for (const x of ticked) await DB.del('shopping', x.id);
+    await refreshShopping();
+    toast('Cleared ' + ticked.length + ' item' + (ticked.length === 1 ? '' : 's'));
+  });
+}
+
+/* Re-read the store, then repaint whatever is on screen. The list can be
+   changed from the Library or the review sheet, so the paint has to be
+   conditional rather than assuming the Shop tab is showing. */
+async function refreshShopping() {
+  await reload();
+  renderShopBadge();
+  if (S.view === 'shopping') renderShopping();
+  else if (S.view === 'library') renderLibrary();
+}
+
+async function addTypedShopItem() {
+  const name = ($('shop-new').value || '').trim();
+  if (!name) { toast('Type something first'); return; }
+  await addToShopping(name, null);
+  $('shop-new').value = '';
+  $('shop-new').focus();
+}
+
+/* One entry point, used by the row icon, the editor button and free text. */
+async function addToShopping(name, ingId, note) {
+  const clean = String(name || '').trim();
+  if (!clean) return;
+
+  /* Already on the list and not yet bought? Say so rather than duplicating. */
+  const dup = S.shopping.find((x) => !x.done &&
+    (ingId ? x.ingId === ingId : x.name.toLowerCase() === clean.toLowerCase()));
+  if (dup) {
+    toast(clean + ' is already on the list');
+    return;
+  }
+
+  await DB.put('shopping', {
+    id: DB.uid(),
+    name: clean,
+    ingId: ingId || null,
+    note: note || '',
+    done: false,
+    created: Date.now()
+  });
+  await refreshShopping();
+  toast('Added to shopping list');
+}
+
+function renderShopping() {
+  const host = $('shop-list');
+  host.textContent = '';
+  const open = S.shopping.filter((x) => !x.done);
+  const ticked = S.shopping.filter((x) => x.done);
+
+  $('shop-summary').textContent = open.length
+    ? open.length + ' to buy' + (ticked.length ? ' · ' + ticked.length + ' in the basket' : '')
+    : (ticked.length ? ticked.length + ' in the basket' : 'nothing to buy');
+  $('shop-clear').hidden = !ticked.length;
+
+  if (!S.shopping.length) {
+    host.appendChild(el('div', 'empty',
+      'Empty. Tap 🛒 on any ingredient when you notice you are running out, or type something above.'));
+    return;
+  }
+
+  const draw = (item) => {
+    const row = el('div', 'shop-row' + (item.done ? ' is-done' : ''));
+
+    const box = el('button', 'shop-tick' + (item.done ? ' on' : ''), item.done ? '✓' : '');
+    box.type = 'button';
+    box.setAttribute('aria-label', item.done ? 'Untick ' + item.name : 'Tick ' + item.name);
+    box.onclick = async () => {
+      await DB.put('shopping', Object.assign({}, item, { done: !item.done }));
+      await refreshShopping();
+    };
+    row.appendChild(box);
+
+    const main = el('div', 'shop-main');
+    main.appendChild(el('div', 'shop-name', item.name));
+    const ing = item.ingId ? S.ings.get(item.ingId) : null;
+    if (ing && (ing.brand || ing.barcode)) {
+      main.appendChild(el('div', 'shop-sub', [ing.brand, ing.barcode].filter(Boolean).join(' · ')));
+    }
+    row.appendChild(main);
+
+    const del = el('button', 'entry-del', '✕');
+    del.type = 'button';
+    del.setAttribute('aria-label', 'Remove ' + item.name);
+    del.onclick = async () => {
+      await DB.del('shopping', item.id);
+      await refreshShopping();
+    };
+    row.appendChild(del);
+    return row;
+  };
+
+  const list = el('div', 'entries');
+  open.forEach((i) => list.appendChild(draw(i)));
+  host.appendChild(list);
+
+  if (ticked.length) {
+    host.appendChild(el('div', 'more-sub', 'In the basket'));
+    const done = el('div', 'entries');
+    ticked.forEach((i) => done.appendChild(draw(i)));
+    host.appendChild(done);
+  }
 }
 
 /* ============================================================

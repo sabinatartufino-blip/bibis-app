@@ -130,6 +130,27 @@
     </div>
   </section>
 
+  <!-- ============ SHOPPING ============ -->
+  <section class="view" id="view-shopping" hidden>
+    <header class="bar">
+      <div class="bar-title"><h1>Shopping</h1><span class="bar-sub" id="shop-summary"></span></div>
+      <button class="icon-btn" id="shop-copy" aria-label="Copy the list">⎘</button>
+    </header>
+
+    <div class="shop-bar" id="shop-bar">
+      <div class="shop-add-row">
+        <input type="text" id="shop-new" placeholder="Anything — bin bags, olive oil…" autocomplete="off" enterkeyhint="done">
+        <button class="btn primary" id="shop-add">Add</button>
+      </div>
+    </div>
+
+    <div class="scroll">
+      <div id="shop-list" class="list"></div>
+      <button class="btn" id="shop-clear">Clear ticked items</button>
+      <div class="pad-bottom"></div>
+    </div>
+  </section>
+
   <!-- ============ TRENDS ============ -->
   <section class="view" id="view-trends" hidden>
     <header class="bar"><div class="bar-title"><h1>Trends</h1><span class="bar-sub">Last 14 days</span></div></header>
@@ -263,6 +284,7 @@
   <nav class="tabs" id="tabs">
     <button class="tab is-on" data-view="today"><span class="tab-ico">◉</span>Today</button>
     <button class="tab" data-view="library"><span class="tab-ico">▤</span>Library</button>
+    <button class="tab" data-view="shopping"><span class="tab-ico">🛒</span>Shop<span class="tab-badge" id="shop-badge" hidden></span></button>
     <button class="tab" data-view="trends"><span class="tab-ico">◫</span>Trends</button>
     <button class="tab" data-view="settings"><span class="tab-ico">⚙</span>Settings</button>
   </nav>
@@ -363,6 +385,8 @@
       <!-- No `capture` here on purpose: without it Android offers Camera,
            Gallery and Files, so one button covers every case. -->
       <input type="file" id="r-photo-file" accept="image/*" hidden>
+      <button class="btn" id="r-shop">Add to shopping list</button>
+
       <div class="sheet-actions">
         <button class="btn danger" id="r-delete" hidden>Delete</button>
         <button class="btn primary grow" id="r-save">Save to library</button>
