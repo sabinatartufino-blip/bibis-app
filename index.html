@@ -3,8 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#31471B" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#14170F" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" id="meta-theme" content="#D9827C">
+<script>
+  /* Stamp the theme before the first pixel, so there is never a flash of the
+     wrong ground. localStorage rather than IndexedDB because this has to be
+     synchronous and it runs before anything else. */
+  (function () {
+    var t = 'pink';
+    try { t = localStorage.getItem('bibis-theme') || 'pink'; } catch (e) {}
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Bibi's App">
@@ -173,8 +182,32 @@
       </div>
 
       <div class="block">
+        <div class="block-head"><h2>Appearance</h2></div>
+        <div class="form-grid">
+          <label class="wide">Theme
+            <select id="theme-pick">
+              <option value="pink">Dusty pink — brand ground</option>
+              <option value="light">Cream — quieter</option>
+              <option value="dark">Dark olive</option>
+            </select>
+          </label>
+        </div>
+        <div class="derived">The app no longer follows your phone's dark mode — pick it here instead.</div>
+      </div>
+
+      <div class="block">
+        <div class="block-head"><h2>Food databases</h2></div>
+        <p class="block-body">USDA FoodData Central is the reference table for whole foods — kiwi, oats, chicken breast. The key is free and takes a minute. Without it, name searches fall back to the vision model below, or to Open Food Facts.</p>
+        <div class="form-grid">
+          <label class="wide">USDA FoodData Central key<input type="password" id="usda-key" placeholder="Paste key" autocomplete="off"></label>
+        </div>
+        <button class="btn" id="usda-test">Test the USDA key</button>
+        <div class="derived" id="usda-status"></div>
+      </div>
+
+      <div class="block">
         <div class="block-head"><h2>Label reading</h2></div>
-        <p class="block-body">Photographing a nutrition label sends that one image to a vision model, which returns the values and the basis they apply to. Your key is stored only on this phone and never leaves it except to call the API you chose.</p>
+        <p class="block-body">Photographing a nutrition label sends that one image to a vision model, which returns the values and the basis they apply to. The same key answers name searches when USDA has no match. Your keys are stored only on this phone and never leave it except to call the API you chose.</p>
         <div class="form-grid">
           <label class="wide">Provider
             <select id="ai-provider">
@@ -244,6 +277,7 @@
       <div class="method-row">
         <button class="method" id="m-barcode"><b>Scan barcode</b><span>Looks the product up in Open Food Facts</span></button>
         <button class="method" id="m-photo"><b>Photograph the label</b><span>Reads the values off the nutrition table</span></button>
+        <button class="method" id="m-name"><b>Search by name</b><span>For food with no barcode and no label — kiwi, carrots, a peach</span></button>
         <button class="method" id="m-manual"><b>Type it in</b><span>Enter the numbers yourself</span></button>
       </div>
       <input type="file" id="photo-input" accept="image/*" capture="environment" hidden>
@@ -263,6 +297,19 @@
     </div>
   </div>
 
+  <!-- search a food database by name -->
+  <div class="sheet" id="sheet-name" hidden>
+    <div class="sheet-head"><h2>Search by name</h2><button class="icon-btn" data-close>✕</button></div>
+    <div class="sheet-body">
+      <div class="name-search">
+        <input type="search" id="nm-q" placeholder="kiwi, rolled oats, feta…" autocomplete="off" enterkeyhint="search">
+        <button class="btn primary" id="nm-go">Look up</button>
+      </div>
+      <div class="derived" id="nm-status"></div>
+      <div id="nm-results" class="list compact"></div>
+    </div>
+  </div>
+
   <!-- review / edit an ingredient -->
   <div class="sheet" id="sheet-review" hidden>
     <div class="sheet-head"><h2 id="review-title">Check the values</h2><button class="icon-btn" data-close>✕</button></div>
@@ -270,7 +317,12 @@
       <div class="provenance" id="review-prov" hidden></div>
       <div class="photo-row" id="review-photos"></div>
       <div class="form-grid">
-        <label class="wide">Name<input type="text" id="r-name" autocomplete="off"></label>
+        <label class="wide">Name
+          <span class="with-btn">
+            <input type="text" id="r-name" autocomplete="off">
+            <button class="btn-inline" id="r-lookup" title="Fill the values from a food database">Look up</button>
+          </span>
+        </label>
         <label>Brand<input type="text" id="r-brand" autocomplete="off"></label>
         <label>Barcode<input type="text" id="r-barcode" inputmode="numeric" autocomplete="off"></label>
         <label class="hl">Label values per<input type="number" id="r-basis" inputmode="decimal" step="1"></label>

@@ -108,7 +108,8 @@ const DB = (() => {
         api.all('weights'), api.settings()
       ]);
       const safeSettings = Object.assign({}, settings);
-      delete safeSettings.aiKey; // never write a key into a file that gets emailed around
+      delete safeSettings.aiKey;   // never write a key into a file that gets emailed around
+      delete safeSettings.usdaKey;
       const ings = [];
       for (const i of ingredients) {
         const copy = Object.assign({}, i);
@@ -154,6 +155,7 @@ const DB = (() => {
       if (data.settings) {
         const keep = Object.assign({}, data.settings);
         delete keep.aiKey;
+        delete keep.usdaKey;
         await api.saveSettings(keep);
       }
       return {
@@ -199,6 +201,8 @@ const DEFAULT_SETTINGS = {
   aiProvider: 'gemini',
   aiKey: '',
   aiModel: 'gemini-2.0-flash',
+  usdaKey: '',
+  theme: 'pink',
   seeded: false,
   welcomed: false
 };

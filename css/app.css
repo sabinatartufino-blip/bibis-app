@@ -45,8 +45,46 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
 }
 
+/* ---------- PINK: the brand pink as the page ground ----------
+   Cards stay cream so the numbers keep their contrast; everything that
+   sits directly on the pink is darkened until it reads against it. */
+:root[data-theme="pink"] {
+  --bg: #D9827C;
+  --surface: #FFFDFA;
+  --surface-2: #F5EFE8;
+  --ink: #1E2915;
+  --muted: #26311C;
+  --faint: #2C3823;
+  --line: #E3DCCE;
+  --line-strong: #C9C1AF;
+
+  --accent: #31471B;
+  --accent-ink: #FFFDFA;
+  --accent-soft: #E9EDE0;
+  --brand-pink: #D9827C;
+  --brand-pink-ink: #A8443C;
+
+  --pro: #A8443C;
+  --car: #8F6716;
+  --fat: #6E4E77;
+  --fib: #31471B;
+  --pro-bar: #C9635C;
+  --car-bar: #C9963F;
+  --fat-bar: #9E7EA6;
+  --fib-bar: #4F7029;
+  --pro-soft: #F7E4E2;
+  --car-soft: #F5EAD3;
+  --fat-soft: #EDE4EF;
+  --fib-soft: #E2EAD6;
+
+  --shadow: 0 1px 2px rgba(60,25,22,.10), 0 10px 28px -18px rgba(60,25,22,.42);
+  --shadow-up: 0 -6px 24px -12px rgba(60,25,22,.30);
+}
+
+/* Auto dark applies only until the app stamps a theme of its own, which it
+   does on the first paint. Dark is then a choice, never a surprise. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme]) {
     --bg: #14170F;
     --surface: #1D2117;
     --surface-2: #262B1E;
@@ -200,7 +238,18 @@ body {
   color: var(--muted);
 }
 .slot-kcal { font-family: var(--mono); font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
-.slot-add { font-family: var(--mono); font-size: 12px; color: var(--accent); background: none; border: none; padding: 2px 4px; cursor: pointer; }
+/* A cream pill rather than bare text: it reads as tappable, and it keeps its
+   contrast on the pink ground where plain olive-on-pink sits near 3.5:1. */
+.slot-add {
+  font-family: var(--mono); font-size: 11.5px;
+  color: var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 11px;
+  cursor: pointer;
+}
+.slot-add:active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 
 .entries { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
 .entry { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
@@ -364,6 +413,7 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .src-ai { background: var(--fat-soft); color: var(--fat); }
 .src-manual { background: var(--surface-2); color: var(--faint); }
 .src-seed { background: var(--accent-soft); color: var(--accent); }
+.src-usda { background: var(--fib-soft); color: var(--fib); }
 
 /* ---------- sheets ---------- */
 .sheet-host { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; }
@@ -429,6 +479,27 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 .cam-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cam-reticle { position: absolute; inset: 26% 10%; border: 2px solid rgba(255,255,255,.85); border-radius: 10px; }
 .manual-code { margin-top: 2px; }
+
+/* name search */
+.name-search { display: flex; gap: 8px; align-items: stretch; }
+.name-search input { flex: 1 1 auto; }
+.name-search .btn { flex: 0 0 auto; width: auto; padding: 9px 15px; }
+
+.with-btn { display: flex; gap: 6px; align-items: stretch; }
+.with-btn input { flex: 1 1 auto; }
+.btn-inline {
+  flex: 0 0 auto;
+  font-family: var(--sans);
+  font-size: 12.5px; font-weight: 500;
+  letter-spacing: 0; text-transform: none;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+.btn-inline:active { background: var(--accent); color: var(--accent-ink); }
 
 .portion-amount { display: flex; align-items: baseline; gap: 8px; justify-content: center; padding: 6px 0 2px; }
 .portion-amount input { font-size: 34px; font-weight: 600; text-align: center; width: 150px; padding: 6px 8px; }

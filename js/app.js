@@ -2,7 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.3.0';
 
 /* How long the opening screen is guaranteed to stay up. Below roughly a
    second a splash reads as a glitch; much above it and you are just making
@@ -26,6 +26,7 @@ const S = {
   photoTarget: null,
   portion: null,     // {kind, ref, g, entryId}
   recipeDraft: null,
+  nameResults: [],
   stopScanner: null,
   thumbs: new Map()
 };
@@ -45,6 +46,7 @@ const el = (tag, cls, text) => {
 async function boot() {
   $('about-ver').textContent = APP_VERSION;
   S.settings = await DB.settings();
+  applyTheme(S.settings.theme);
   if (!S.settings.seeded) await seedLibrary();
   await reload();
   bindNav();
@@ -57,6 +59,7 @@ async function boot() {
   bindWeight();
   bindSettings();
   bindWelcome();
+  bindNameSearch();
   renderAll();
   if (!S.settings.welcomed) $('welcome').hidden = false;
   await closeSplash();
@@ -131,6 +134,16 @@ async function seedLibrary() {
   S.settings = await DB.saveSettings({ seeded: true });
 }
 
+const THEME_BAR = { pink: '#D9827C', light: '#F6F3EC', dark: '#14170F' };
+
+function applyTheme(name) {
+  const t = THEME_BAR[name] ? name : 'pink';
+  document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem('bibis-theme', t); } catch (e) { /* private mode */ }
+  const meta = $('meta-theme');
+  if (meta) meta.setAttribute('content', THEME_BAR[t]);
+}
+
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.register('sw.js').catch(() => { /* offline support unavailable */ });
@@ -175,7 +188,7 @@ function busy(on, text) {
   $('busy').hidden = !on;
 }
 
-const SHEETS = ['add', 'scan', 'review', 'portion', 'recipe', 'weight'];
+const SHEETS = ['add', 'scan', 'name', 'review', 'portion', 'recipe', 'weight'];
 function openSheet(name) {
   $('sheet-host').hidden = false;
   SHEETS.forEach((s) => { $('sheet-' + s).hidden = s !== name; });
@@ -475,6 +488,8 @@ function srcTag(source) {
   const map = {
     off: ['src-off', 'OFF'],
     ai: ['src-ai', 'PHOTO'],
+    usda: ['src-usda', 'USDA'],
+    lookup: ['src-ai', 'LOOKED UP'],
     manual: ['src-manual', 'TYPED'],
     seed: ['src-seed', 'PLAN'],
     verify: ['src-ai', 'CHECK']
@@ -562,6 +577,84 @@ async function onPhotoRead(ev) {
   } catch (e) {
     busy(false);
     toast(e.message, 5000);
+  }
+}
+
+/* ============================================================
+   NAME SEARCH — food with no barcode and no label
+   ============================================================ */
+
+function bindNameSearch() {
+  $('m-name').addEventListener('click', () => openNameSearch(''));
+  $('nm-go').addEventListener('click', runNameSearch);
+  $('nm-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') runNameSearch(); });
+
+  $('nm-results').addEventListener('click', (e) => {
+    const row = e.target.closest('.row');
+    if (!row) return;
+    const draft = S.nameResults[Number(row.dataset.i)];
+    if (!draft) return;
+    openReview(draft, { isNew: true });
+  });
+
+  /* the same lookup, reachable from a half-filled ingredient form */
+  $('r-lookup').addEventListener('click', () => {
+    const q = ($('r-name').value || '').trim();
+    if (!q) { toast('Type a name first, then look it up'); return; }
+    openNameSearch(q, true);
+  });
+}
+
+function openNameSearch(q, autorun) {
+  $('nm-q').value = q || '';
+  $('nm-results').textContent = '';
+  S.nameResults = [];
+  $('nm-status').textContent = sourceLine();
+  openSheet('name');
+  if (autorun && q) runNameSearch();
+}
+
+function sourceLine() {
+  if ((S.settings.usdaKey || '').trim()) return 'Searching USDA FoodData Central.';
+  if (S.settings.aiProvider !== 'none' && (S.settings.aiKey || '').trim()) {
+    return 'No USDA key, so the model answers from reference tables. Add a USDA key under Settings for the real thing.';
+  }
+  return 'No keys set, so this searches Open Food Facts — branded products, patchy for raw food. A USDA key under Settings fixes that.';
+}
+
+async function runNameSearch() {
+  const q = ($('nm-q').value || '').trim();
+  if (q.length < 2) { toast('Type at least two letters'); return; }
+  const host = $('nm-results');
+  host.textContent = '';
+  $('nm-status').textContent = 'Searching for "' + q + '"…';
+  busy(true, 'Searching…');
+  try {
+    const results = await Vision.searchByName(q, S.settings);
+    S.nameResults = results;
+    busy(false);
+    $('nm-status').textContent = results.length === 1
+      ? 'One match. Tap it to check the values.'
+      : results.length + ' matches. Tap the closest one — you can still edit every value.';
+    results.forEach((r, i) => {
+      const row = el('button', 'row');
+      row.dataset.i = i;
+      row.appendChild(el('div', 'row-thumb', (r._label || r.name || '?').charAt(0).toUpperCase()));
+      const main = el('div', 'row-main');
+      main.appendChild(el('div', 'row-name', r._label || r.name));
+      main.appendChild(el('div', 'row-sub', r._sub ||
+        (Calc.fmt(r.kcal, 0) + ' kcal · ' + Calc.fmt(r.pro, 1) + ' P · ' +
+         Calc.fmt(r.car, 1) + ' C · ' + Calc.fmt(r.fat, 1) + ' F')));
+      row.appendChild(main);
+      const right = el('div', 'row-right');
+      right.appendChild(srcTag(r.source));
+      right.appendChild(el('span', 'row-basis', 'per 100 ' + (r.unit || 'g')));
+      row.appendChild(right);
+      host.appendChild(row);
+    });
+  } catch (e) {
+    busy(false);
+    $('nm-status').textContent = e.message;
   }
 }
 
@@ -1150,6 +1243,28 @@ function bindSettings() {
     if (p === 'anthropic' && !/claude/.test($('ai-model').value)) $('ai-model').value = 'claude-sonnet-4-5';
   });
 
+  $('theme-pick').addEventListener('change', async () => {
+    applyTheme($('theme-pick').value);
+    S.settings = await DB.saveSettings({ theme: $('theme-pick').value });
+  });
+
+  $('usda-key').addEventListener('change', async () => {
+    S.settings = await DB.saveSettings({ usdaKey: $('usda-key').value.trim() });
+    $('usda-status').textContent = 'Saved on this phone.';
+  });
+
+  $('usda-test').addEventListener('click', async () => {
+    const st = $('usda-status');
+    if (!(S.settings.usdaKey || '').trim()) { st.textContent = 'Paste a key first.'; return; }
+    st.textContent = 'Testing…';
+    try {
+      const n = await Vision.testUsda(S.settings.usdaKey);
+      st.textContent = '✓ Works — "kiwifruit" returned ' + n + ' matches.';
+    } catch (e) {
+      st.textContent = '✕ ' + e.message;
+    }
+  });
+
   $('ai-test').addEventListener('click', async () => {
     const st = $('ai-status');
     if (S.settings.aiProvider === 'none') { st.textContent = 'Label reading is off.'; return; }
@@ -1235,6 +1350,8 @@ function renderSettings() {
   $('ai-provider').value = S.settings.aiProvider;
   $('ai-key').value = S.settings.aiKey;
   $('ai-model').value = S.settings.aiModel;
+  $('usda-key').value = S.settings.usdaKey || '';
+  $('theme-pick').value = THEME_BAR[S.settings.theme] ? S.settings.theme : 'pink';
   renderDerived();
 }
 

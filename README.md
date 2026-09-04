@@ -4,13 +4,15 @@
 lives in your phone's own storage. It installs to the home screen like any app and works
 with no signal.
 
-Three ways to get a product's numbers in:
+Four ways to get a food's numbers in:
 
 1. **Scan the barcode** → looked up in [Open Food Facts](https://world.openfoodfacts.org)
    (free, no key, good European coverage)
 2. **Photograph the nutrition label** → a vision model reads it and returns the values
    *plus the basis they apply to*
-3. **Type them in** → always available
+3. **Search by name** → for food with no barcode and no label: a kiwi, a carrot, rolled oats.
+   Tries USDA FoodData Central first, then the vision model, then an Open Food Facts text search
+4. **Type them in** → always available
 
 Nothing an extraction produces is saved until you look at it and tap Save. A misread
 "per serving" column would silently poison every future calculation, so it always asks.
@@ -56,7 +58,20 @@ require it, and Pages gives it to you for free.
 It opens already loaded with your current plan: 18 ingredients, plus **Morning bowl** and
 **Afternoon shake** as saved meals, so a day is two taps rather than eighteen.
 
-### 4. Add a key for label reading (optional)
+### 4. Add a USDA key for name searches (optional, one minute, free)
+
+Searching by name works with no key at all — it falls back to the vision model, then to an
+Open Food Facts text search. But for whole foods the right source is the reference table:
+
+1. [fdc.nal.usda.gov/api-key-signup](https://fdc.nal.usda.gov/api-key-signup) — name and
+   email, the key arrives immediately
+2. In the app: **Settings › Food databases** → paste it → **Test the USDA key**
+
+A ✓ means "kiwifruit" returned matches. Searches then use the **Foundation** and **SR Legacy**
+datasets, which are measured whole-food values per 100 g rather than manufacturer-submitted
+label data.
+
+### 5. Add a key for label reading (optional)
 
 Barcode scanning and manual entry work with no key at all. The key is only for reading a
 photographed label.
