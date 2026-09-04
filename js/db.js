@@ -200,7 +200,7 @@ const DEFAULT_SETTINGS = {
   targets: { kcal: 1550, pro: 122, car: 140, fat: 55, fib: 28 },
   aiProvider: 'gemini',
   aiKey: '',
-  aiModel: 'gemini-2.0-flash',
+  aiModel: 'gemini-2.5-flash',
   usdaKey: '',
   theme: 'pink',
   seeded: false,

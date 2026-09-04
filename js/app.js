@@ -2,7 +2,7 @@
    app.js — screens, state and interaction.
    ============================================================ */
 
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '2.0.0';
 
 /* How long the opening screen is guaranteed to stay up. Below roughly a
    second a splash reads as a glitch; much above it and you are just making
@@ -27,6 +27,8 @@ const S = {
   portion: null,     // {kind, ref, g, entryId}
   recipeDraft: null,
   nameResults: [],
+  draftNut: {},
+  lookupForExisting: false,
   stopScanner: null,
   thumbs: new Map()
 };
@@ -60,6 +62,7 @@ async function boot() {
   bindSettings();
   bindWelcome();
   bindNameSearch();
+  bindFull();
   renderAll();
   if (!S.settings.welcomed) $('welcome').hidden = false;
   await closeSplash();
@@ -188,7 +191,7 @@ function busy(on, text) {
   $('busy').hidden = !on;
 }
 
-const SHEETS = ['add', 'scan', 'name', 'review', 'portion', 'recipe', 'weight'];
+const SHEETS = ['add', 'scan', 'name', 'review', 'portion', 'recipe', 'weight', 'full'];
 function openSheet(name) {
   $('sheet-host').hidden = false;
   SHEETS.forEach((s) => { $('sheet-' + s).hidden = s !== name; });
@@ -581,6 +584,132 @@ async function onPhotoRead(ev) {
 }
 
 /* ============================================================
+   FULL NUTRITION PANEL
+   ============================================================ */
+
+function bindFull() {
+  $('open-full').addEventListener('click', openFullForDay);
+}
+
+function openFullForDay() {
+  const nutrients = S.entries.map((e) => (e.n && typeof e.n === 'object') ? e.n : Nut.of(e));
+  const kcals = S.entries.map((e) => Calc.num(e.kcal));
+  const { sum, coverage } = Nut.total(nutrients, kcals);
+
+  $('full-title').textContent = 'Full nutrition · ' + Calc.dayName(S.date);
+
+  const withData = nutrients.filter((n) => Object.keys(n).some((k) => CORE.indexOf(k) < 0)).length;
+  const note = $('full-note');
+  if (!S.entries.length) {
+    note.textContent = 'Nothing logged for this day yet.';
+  } else if (withData === S.entries.length) {
+    note.textContent = 'All ' + S.entries.length + ' items carry vitamin and mineral data. Percentages are of the EU reference intake for adults (Regulation 1169/2011).';
+  } else {
+    note.textContent = withData + ' of ' + S.entries.length + ' items carry vitamin and mineral data. Where an item has no value for a nutrient it is left out of that total rather than counted as zero — so each figure says how much of the day it actually covers.';
+  }
+
+  renderNutPanel($('full-panel'), sum, coverage, true);
+  openSheet('full');
+}
+
+function renderNutPanel(host, sum, coverage, showCoverage) {
+  host.textContent = '';
+  NUTRIENT_GROUPS.forEach((group) => {
+    const keys = Nut.keysInGroup(group.id);
+    if (!keys.some((k) => sum[k] !== undefined)) return;
+
+    const wrap = el('div', 'nut-group');
+    wrap.appendChild(el('h3', null, group.name));
+    const rows = el('div', 'nut-rows');
+
+    keys.forEach((key) => {
+      const meta = NUT[key];
+      const value = sum[key];
+      const known = value !== undefined;
+      const row = el('div', 'nut-row' + (known ? '' : ' none'));
+
+      row.appendChild(el('div', 'nut-name', meta.label));
+      const val = el('div', 'nut-val');
+      val.textContent = known ? Nut.fmt(key, value) : 'no data';
+      if (known) val.appendChild(el('small', null, meta.unit));
+      row.appendChild(val);
+
+      if (known && meta.nrv) {
+        const pct = Nut.pct(key, value);
+        const meter = el('div', 'nut-meter');
+        const bar = el('div', 'ri-track');
+        const fill = el('i');
+        fill.style.width = Math.min(100, pct) + '%';
+        if (pct > 150) fill.classList.add('high');
+        bar.appendChild(fill);
+        meter.appendChild(bar);
+        meter.appendChild(el('span', 'pct', Math.round(pct) + '% RI'));
+        row.appendChild(meter);
+      }
+
+      if (known && showCoverage && coverage[key] && coverage[key].energyShare < 0.995) {
+        const c = coverage[key];
+        row.appendChild(el('div', 'nut-cover',
+          'covers ' + Math.round(c.energyShare * 100) + '% of the day’s energy · ' +
+          c.items + ' of ' + c.ofItems + ' items'));
+      }
+      rows.appendChild(row);
+    });
+
+    wrap.appendChild(rows);
+    host.appendChild(wrap);
+  });
+
+  if (!host.children.length) host.appendChild(el('div', 'empty', 'No nutrient data yet.'));
+}
+
+/* ---------- the editable panel inside the review sheet ---------- */
+
+function renderMoreNutrients() {
+  const host = $('r-more-fields');
+  host.textContent = '';
+  const current = S.draftNut || {};
+  $('r-more-basis').textContent = (parseFloat($('r-basis').value) || 100) + ' ' + $('r-unit').value;
+
+  const countLabel = () => {
+    const n = Object.keys(S.draftNut).filter((k) => CORE.indexOf(k) < 0).length;
+    $('r-more-count').textContent = n ? n + ' with values' : 'none set';
+  };
+  countLabel();
+
+  NUTRIENT_GROUPS.forEach((group) => {
+    const keys = Nut.keysInGroup(group.id).filter((k) => CORE.indexOf(k) < 0);
+    if (!keys.length) return;
+    host.appendChild(el('div', 'more-sub', group.name));
+    const grid = el('div', 'more-grid');
+    keys.forEach((key) => {
+      const meta = NUT[key];
+      const label = el('label');
+      label.appendChild(el('span', null, meta.label + ' (' + meta.unit + ')'));
+      const inp = el('input');
+      inp.type = 'number';
+      inp.step = 'any';
+      inp.min = '0';
+      inp.inputMode = 'decimal';
+      inp.placeholder = 'no data';
+      inp.value = current[key] !== undefined ? current[key] : '';
+      inp.addEventListener('input', () => {
+        const raw = inp.value.trim();
+        if (raw === '') delete S.draftNut[key];
+        else {
+          const v = parseFloat(raw);
+          if (isFinite(v)) S.draftNut[key] = v;
+        }
+        countLabel();
+      });
+      label.appendChild(inp);
+      grid.appendChild(label);
+    });
+    host.appendChild(grid);
+  });
+}
+
+/* ============================================================
    NAME SEARCH — food with no barcode and no label
    ============================================================ */
 
@@ -594,6 +723,16 @@ function bindNameSearch() {
     if (!row) return;
     const draft = S.nameResults[Number(row.dataset.i)];
     if (!draft) return;
+
+    /* Opened from an existing ingredient's form, so fill that record in
+       place. Creating a second "Carrots, raw" would leave the day log
+       pointing at whichever one happened to be picked first. */
+    if (S.lookupForExisting) {
+      fillReviewFrom(draft);
+      openSheet('review');
+      toast('Values filled in — check them, then Save');
+      return;
+    }
     openReview(draft, { isNew: true });
   });
 
@@ -601,14 +740,38 @@ function bindNameSearch() {
   $('r-lookup').addEventListener('click', () => {
     const q = ($('r-name').value || '').trim();
     if (!q) { toast('Type a name first, then look it up'); return; }
-    openNameSearch(q, true);
+    openNameSearch(q, true, true);
   });
 }
 
-function openNameSearch(q, autorun) {
+/* Overwrite the open review form's values from a search result, keeping the
+   name the user already typed and keeping the record's identity. */
+function fillReviewFrom(draft) {
+  const keepName = ($('r-name').value || '').trim();
+  $('r-basis').value = Calc.basisOf(draft);
+  $('r-unit').value = draft.unit === 'ml' ? 'ml' : 'g';
+  MACROS.forEach((k) => { $('r-' + k).value = Calc.num(draft[k]); });
+  if (!keepName) $('r-name').value = draft.name || '';
+  if (draft.brand && !($('r-brand').value || '').trim()) $('r-brand').value = draft.brand;
+
+  S.draftNut = Nut.of(draft);
+  if (S.draft) S.draft.source = draft.source;
+  renderMoreNutrients();
+  $('r-more').open = true;
+
+  const prov = $('review-prov');
+  prov.textContent = (draft.note || '') +
+    ' — values replaced from this lookup, and the basis is now ' +
+    Calc.basisOf(draft) + ' ' + (draft.unit || 'g') + '.';
+  prov.hidden = false;
+  prov.classList.toggle('off', draft.source === 'off');
+}
+
+function openNameSearch(q, autorun, forExisting) {
   $('nm-q').value = q || '';
   $('nm-results').textContent = '';
   S.nameResults = [];
+  S.lookupForExisting = !!forExisting;
   $('nm-status').textContent = sourceLine();
   openSheet('name');
   if (autorun && q) runNameSearch();
@@ -697,6 +860,11 @@ function openReview(draft, opts) {
   MACROS.forEach((k) => { $('r-' + k).value = Calc.num(draft[k]); });
   $('r-delete').hidden = !draft.id;
 
+  /* Everything beyond the five macros lives here while the sheet is open. */
+  S.draftNut = Nut.of(draft);
+  $('r-more').open = false;
+  renderMoreNutrients();
+
   renderReviewPhotos();
   openSheet('review');
 }
@@ -739,6 +907,13 @@ async function saveReview() {
     updated: Date.now()
   };
   MACROS.forEach((k) => { ing[k] = Calc.num($('r-' + k).value); });
+
+  /* The five macros are authoritative from their own fields; the extended
+     panel keeps whatever it holds. Salt and sodium are kept consistent. */
+  const nut = Object.assign({}, S.draftNut);
+  MACROS.forEach((k) => { nut[k] = ing[k]; });
+  Nut.deriveSalt(nut);
+  ing.n = nut;
 
   await DB.put('ingredients', ing);
   S.thumbs.delete(ing.id);
@@ -820,12 +995,31 @@ function fillChips(values, label) {
 function portionMacros() {
   const p = S.portion;
   const v = Calc.num($('portion-g').value);
-  if (p.kind === 'ing') return { macros: Calc.scale(p.ref, v), g: v, mult: 1 };
+
+  if (p.kind === 'ing') {
+    return {
+      macros: Calc.scale(p.ref, v),
+      nut: Nut.scale(Nut.of(p.ref), v, Calc.basisOf(p.ref)),
+      g: v, mult: 1
+    };
+  }
+
   const { macros, grams } = Calc.scaleRecipe(p.ref, S.ings);
   const mult = v / 100;
   const out = {};
   MACROS.forEach((k) => { out[k] = macros[k] * mult; });
-  return { macros: out, g: grams * mult, mult };
+
+  /* A recipe's nutrient total is only as complete as its ingredients. Sum
+     what is known per nutrient; a nutrient no ingredient knows stays absent. */
+  const nut = {};
+  (p.ref.items || []).forEach((it) => {
+    const ing = S.ings.get(it.ingId);
+    if (!ing) return;
+    const scaled = Nut.scale(Nut.of(ing), Calc.num(it.g) * mult, Calc.basisOf(ing));
+    Object.keys(scaled).forEach((k) => { nut[k] = (nut[k] || 0) + scaled[k]; });
+  });
+
+  return { macros: out, nut, g: grams * mult, mult };
 }
 
 function renderPortionPreview() {
@@ -843,7 +1037,7 @@ function renderPortionPreview() {
 
 async function savePortion() {
   const p = S.portion;
-  const { macros, g, mult } = portionMacros();
+  const { macros, nut, g, mult } = portionMacros();
   if (!(g > 0)) { toast('Enter an amount above zero'); return; }
 
   const entry = {
@@ -859,6 +1053,13 @@ async function savePortion() {
     created: Date.now()
   };
   MACROS.forEach((k) => { entry[k] = Math.round(macros[k] * 100) / 100; });
+
+  /* Snapshot the full panel too, for the same reason as the macros: what you
+     ate today must not change when you correct an ingredient tomorrow. */
+  const snap = {};
+  Object.keys(nut || {}).forEach((k) => { snap[k] = Math.round(nut[k] * 1000) / 1000; });
+  MACROS.forEach((k) => { snap[k] = entry[k]; });
+  entry.n = snap;
 
   if (p.entryId) {
     const old = S.entries.find((e) => e.id === p.entryId);
@@ -1239,7 +1440,7 @@ function bindSettings() {
 
   $('ai-provider').addEventListener('change', () => {
     const p = $('ai-provider').value;
-    if (p === 'gemini' && !/gemini/.test($('ai-model').value)) $('ai-model').value = 'gemini-2.0-flash';
+    if (p === 'gemini' && !/gemini/.test($('ai-model').value)) $('ai-model').value = 'gemini-2.5-flash';
     if (p === 'anthropic' && !/claude/.test($('ai-model').value)) $('ai-model').value = 'claude-sonnet-4-5';
   });
 

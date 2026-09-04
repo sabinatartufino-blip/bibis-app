@@ -50,6 +50,51 @@ const Vision = (() => {
     });
   }
 
+  /* Open Food Facts nutriment keys → canonical keys. OFF stores everything
+     per 100 g in base SI units, so sodium/salt arrive in grams and the
+     vitamins in grams too — hence the unit column. */
+  const OFF_MAP = [
+    ['pro', 'proteins_100g', 'G'], ['car', 'carbohydrates_100g', 'G'],
+    ['fat', 'fat_100g', 'G'], ['fib', 'fiber_100g', 'G'],
+    ['sug', 'sugars_100g', 'G'], ['sat', 'saturated-fat_100g', 'G'],
+    ['mono', 'monounsaturated-fat_100g', 'G'], ['poly', 'polyunsaturated-fat_100g', 'G'],
+    ['chol', 'cholesterol_100g', 'G'], ['starch', 'starch_100g', 'G'],
+    ['na', 'sodium_100g', 'G'], ['salt', 'salt_100g', 'G'],
+    ['k', 'potassium_100g', 'G'], ['ca', 'calcium_100g', 'G'],
+    ['p', 'phosphorus_100g', 'G'], ['mg', 'magnesium_100g', 'G'],
+    ['fe', 'iron_100g', 'G'], ['zn', 'zinc_100g', 'G'],
+    ['cu', 'copper_100g', 'G'], ['mn', 'manganese_100g', 'G'],
+    ['se', 'selenium_100g', 'G'], ['i', 'iodine_100g', 'G'],
+    ['va', 'vitamin-a_100g', 'G'], ['vd', 'vitamin-d_100g', 'G'],
+    ['ve', 'vitamin-e_100g', 'G'], ['vk', 'vitamin-k_100g', 'G'],
+    ['vc', 'vitamin-c_100g', 'G'], ['b1', 'vitamin-b1_100g', 'G'],
+    ['b2', 'vitamin-b2_100g', 'G'], ['b3', 'vitamin-pp_100g', 'G'],
+    ['b6', 'vitamin-b6_100g', 'G'], ['b9', 'vitamin-b9_100g', 'G'],
+    ['b12', 'vitamin-b12_100g', 'G'], ['b7', 'biotin_100g', 'G'],
+    ['b5', 'pantothenic-acid_100g', 'G'], ['alc', 'alcohol_100g', 'G']
+  ];
+
+  function offNutrients(nutriments) {
+    const src = nutriments || {};
+    const out = {};
+
+    let kcal = parseFloat(src['energy-kcal_100g']);
+    if (!isFinite(kcal)) {
+      const kj = parseFloat(src['energy-kj_100g']) || parseFloat(src['energy_100g']);
+      if (isFinite(kj)) kcal = kj / 4.184;
+    }
+    if (isFinite(kcal)) out.kcal = Math.round(kcal * 10) / 10;
+
+    OFF_MAP.forEach(([key, offKey, unit]) => {
+      const v = parseFloat(src[offKey]);
+      if (!isFinite(v)) return;
+      const converted = convertUnit(v, unit, NUT[key].unit);
+      if (converted === null) return;
+      out[key] = converted;
+    });
+    return Nut.deriveSalt(out);
+  }
+
   /* ---------- tier 1: Open Food Facts ---------- */
 
   async function lookupBarcode(code) {
@@ -79,35 +124,23 @@ const Vision = (() => {
     }
 
     const p = json.product;
-    const n = p.nutriments || {};
-    const pick = (...keys) => {
-      for (const k of keys) {
-        const v = parseFloat(n[k]);
-        if (isFinite(v)) return v;
-      }
-      return 0;
-    };
+    const n = offNutrients(p.nutriments);
+    const extras = Object.keys(n).filter((k) => CORE.indexOf(k) < 0).length;
 
-    let kcal = pick('energy-kcal_100g');
-    if (!kcal) {
-      const kj = pick('energy-kj_100g', 'energy_100g');
-      if (kj) kcal = Math.round(kj / 4.184 * 10) / 10;
-    }
-
-    return {
+    const draft = {
       name: p.product_name || p.product_name_en || p.product_name_de || '',
       brand: (p.brands || '').split(',')[0].trim(),
       barcode: clean,
       basis: 100,
       unit: 'g',
-      kcal,
-      pro: pick('proteins_100g'),
-      car: pick('carbohydrates_100g'),
-      fat: pick('fat_100g'),
-      fib: pick('fiber_100g'),
+      n,
       source: 'off',
-      note: 'Open Food Facts, per 100 g. Community-entered — worth a glance before you trust it.'
+      note: 'Open Food Facts, per 100 g' +
+        (extras ? ' · ' + extras + ' extra nutrients' : ' · macros only, no vitamin or mineral data') +
+        '. Community-entered — worth a glance before you trust it.'
     };
+    CORE.forEach((k) => { draft[k] = n[k] !== undefined ? n[k] : 0; });
+    return draft;
   }
 
   /* ---------- name search: whole foods with no barcode ----------
@@ -117,7 +150,88 @@ const Vision = (() => {
        Open Food Facts search — no key, but branded products, so noisy for raw food
      All three return candidates for you to pick from, never a silent answer. */
 
-  const USDA_NUTRIENTS = { 208: 'kcal', 203: 'pro', 205: 'car', 204: 'fat', 291: 'fib' };
+  /* USDA nutrient mapping.
+
+     Matched on the nutrient NAME, not the number. Numbers are terse and a
+     mistyped one silently files a value under the wrong nutrient — the
+     worst possible failure here. Names are long, stable, and if one ever
+     changes the nutrient simply reads as "no data" instead of as a lie.
+
+     [canonical key, exact USDA name, expected unit] */
+  const USDA_MAP = [
+    ['kcal',   'energy',                                  'KCAL'],
+    ['pro',    'protein',                                 'G'],
+    ['car',    'carbohydrate, by difference',             'G'],
+    ['fat',    'total lipid (fat)',                       'G'],
+    ['fib',    'fiber, total dietary',                    'G'],
+    ['sug',    'total sugars',                            'G'],
+    ['starch', 'starch',                                  'G'],
+    ['sat',    'fatty acids, total saturated',            'G'],
+    ['mono',   'fatty acids, total monounsaturated',      'G'],
+    ['poly',   'fatty acids, total polyunsaturated',      'G'],
+    ['chol',   'cholesterol',                             'MG'],
+    ['na',     'sodium, na',                              'MG'],
+    ['k',      'potassium, k',                            'MG'],
+    ['ca',     'calcium, ca',                             'MG'],
+    ['p',      'phosphorus, p',                           'MG'],
+    ['mg',     'magnesium, mg',                           'MG'],
+    ['fe',     'iron, fe',                                'MG'],
+    ['zn',     'zinc, zn',                                'MG'],
+    ['cu',     'copper, cu',                              'MG'],
+    ['mn',     'manganese, mn',                           'MG'],
+    ['se',     'selenium, se',                            'UG'],
+    ['i',      'iodine, i',                               'UG'],
+    ['va',     'vitamin a, rae',                          'UG'],
+    ['vd',     'vitamin d (d2 + d3)',                     'UG'],
+    ['ve',     'vitamin e (alpha-tocopherol)',            'MG'],
+    ['vk',     'vitamin k (phylloquinone)',               'UG'],
+    ['vc',     'vitamin c, total ascorbic acid',          'MG'],
+    ['b1',     'thiamin',                                 'MG'],
+    ['b2',     'riboflavin',                              'MG'],
+    ['b3',     'niacin',                                  'MG'],
+    ['b6',     'vitamin b-6',                             'MG'],
+    ['b9',     'folate, total',                           'UG'],
+    ['b12',    'vitamin b-12',                            'UG'],
+    ['b7',     'biotin',                                  'UG'],
+    ['b5',     'pantothenic acid',                        'MG'],
+    ['water',  'water',                                   'G'],
+    ['alc',    'alcohol, ethyl',                          'G']
+  ];
+
+  const USDA_BY_NAME = {};
+  USDA_MAP.forEach(([key, name, unit]) => { USDA_BY_NAME[name] = { key, unit }; });
+
+  /* Convert to the unit the app stores this nutrient in. Anything we cannot
+     convert with certainty is dropped rather than guessed at. */
+  function convertUnit(value, from, to) {
+    const f = String(from || '').toUpperCase();
+    const t = String(to || '').toUpperCase();
+    if (!f || f === t) return value;
+    const scale = {
+      'G>MG': 1000, 'MG>G': 0.001,
+      'MG>UG': 1000, 'UG>MG': 0.001,
+      'G>UG': 1e6, 'UG>G': 1e-6
+    }[f + '>' + t];
+    return scale === undefined ? null : value * scale;
+  }
+
+  function usdaNutrients(food) {
+    const out = {};
+    (food.foodNutrients || []).forEach((n) => {
+      const rawName = n.nutrientName || (n.nutrient && n.nutrient.name) || '';
+      const hit = USDA_BY_NAME[String(rawName).trim().toLowerCase()];
+      if (!hit) return;
+      const v = parseFloat(n.value !== undefined ? n.value : n.amount);
+      if (!isFinite(v)) return;
+      const unit = n.unitName || n.nutrientUnit || (n.nutrient && n.nutrient.unitName) || '';
+      /* Energy appears twice on many records, kcal and kJ. Take kcal only. */
+      if (hit.key === 'kcal' && String(unit).toUpperCase() !== 'KCAL') return;
+      const converted = convertUnit(v, unit, hit.unit);
+      if (converted === null) return;
+      out[hit.key] = converted;
+    });
+    return Nut.deriveSalt(out);
+  }
 
   async function searchByName(query, settings) {
     const q = String(query || '').trim();
@@ -152,32 +266,22 @@ const Vision = (() => {
     if (!foods.length) throw new Error('Nothing in USDA matches "' + q + '".');
 
     const mapped = foods.map((f) => {
+      const n = usdaNutrients(f);
+      const extras = Object.keys(n).filter((k) => CORE.indexOf(k) < 0).length;
       const out = {
         name: tidyUsdaName(f.description),
         brand: f.brandOwner || '',
         barcode: '',
         basis: 100,
         unit: 'g',
-        kcal: 0, pro: 0, car: 0, fat: 0, fib: 0,
+        n,
         source: 'usda',
-        note: 'USDA FoodData Central · ' + (f.dataType || '') + ' · per 100 g',
+        note: 'USDA FoodData Central · ' + (f.dataType || '') + ' · per 100 g · ' +
+              extras + ' vitamins, minerals and other nutrients included',
         _label: tidyUsdaName(f.description),
-        _sub: (f.dataType || '') + (f.foodCategory ? ' · ' + f.foodCategory : '')
+        _sub: (f.dataType || '') + ' · ' + extras + ' extra nutrients'
       };
-      (f.foodNutrients || []).forEach((n) => {
-        const numRaw = n.nutrientNumber !== undefined ? n.nutrientNumber : n.number;
-        const num = parseInt(numRaw, 10);
-        const keyName = USDA_NUTRIENTS[num];
-        if (!keyName) return;
-        const v = parseFloat(n.value !== undefined ? n.value : n.amount);
-        if (!isFinite(v)) return;
-        /* energy is listed twice on some records, in kcal and kJ */
-        if (keyName === 'kcal') {
-          const unit = String(n.unitName || n.nutrientUnit || '').toUpperCase();
-          if (unit && unit !== 'KCAL') return;
-        }
-        out[keyName] = v;
-      });
+      CORE.forEach((k) => { out[k] = n[k] !== undefined ? n[k] : 0; });
       return out;
     }).filter((f) => f.kcal || f.pro || f.car || f.fat);
 
@@ -234,7 +338,7 @@ const Vision = (() => {
   }
 
   async function callGeminiText(prompt, key, model) {
-    const m = model || 'gemini-2.0-flash';
+    const m = model || 'gemini-2.5-flash';
     const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' +
       encodeURIComponent(m) + ':generateContent', {
       method: 'POST',
@@ -294,24 +398,21 @@ const Vision = (() => {
     }
     const products = (json && json.products) || [];
     const out = products.map((p) => {
-      const n = p.nutriments || {};
-      const pick = (...keys) => {
-        for (const k of keys) { const v = parseFloat(n[k]); if (isFinite(v)) return v; }
-        return 0;
-      };
-      let kcal = pick('energy-kcal_100g');
-      if (!kcal) { const kj = pick('energy-kj_100g', 'energy_100g'); if (kj) kcal = Math.round(kj / 4.184 * 10) / 10; }
+      const n = offNutrients(p.nutriments);
+      const extras = Object.keys(n).filter((k) => CORE.indexOf(k) < 0).length;
       const name = p.product_name || '';
-      return {
+      const row = {
         name, brand: (p.brands || '').split(',')[0].trim(), barcode: '',
-        basis: 100, unit: 'g',
-        kcal, pro: pick('proteins_100g'), car: pick('carbohydrates_100g'),
-        fat: pick('fat_100g'), fib: pick('fiber_100g'),
+        basis: 100, unit: 'g', n,
         source: 'off',
         note: 'Open Food Facts search, per 100 g. Community-entered — check before you trust it.',
         _label: name,
-        _sub: [(p.brands || '').split(',')[0].trim(), Math.round(kcal) + ' kcal'].filter(Boolean).join(' · ')
+        _sub: [(p.brands || '').split(',')[0].trim(),
+               Math.round(n.kcal || 0) + ' kcal',
+               extras + ' extra nutrients'].filter(Boolean).join(' · ')
       };
+      CORE.forEach((k) => { row[k] = n[k] !== undefined ? n[k] : 0; });
+      return row;
     }).filter((f) => f.name && (f.kcal || f.pro || f.car || f.fat));
     if (!out.length) throw new Error('Nothing in Open Food Facts matches "' + q + '". Type the values in instead.');
     return out;
@@ -329,6 +430,7 @@ const Vision = (() => {
     'Read it and return ONLY a JSON object, no prose and no code fences, with these keys:',
     '{"name":string,"brand":string,"basis":number,"unit":"g"|"ml",',
     ' "kcal":number,"pro":number,"car":number,"fat":number,"fib":number,',
+    ' "sat":number,"sug":number,"salt":number,',
     ' "basis_source":string,"confidence":"high"|"medium"|"low","warning":string}',
     '',
     'Rules:',
@@ -338,6 +440,9 @@ const Vision = (() => {
     '- Energy in kcal. If only kJ is printed, divide by 4.184.',
     '- pro = protein, car = total carbohydrate (NOT "of which sugars"), fat = total fat',
     '  (NOT "of which saturates"), fib = fibre; use 0 when fibre is not declared.',
+    '- sat = the "of which saturates" line, sug = the "of which sugars" line, salt = the salt',
+    '  line in grams. Omit any of these three entirely if the label does not print them —',
+    '  do not send 0 for a line that is simply absent.',
     '- Decimal commas mean decimal points: "1,8" is 1.8.',
     '- Labels may be in German, French, Italian, Serbian, Croatian or English.',
     '- unit is "ml" only for liquids declared per 100 ml.',
@@ -362,7 +467,7 @@ const Vision = (() => {
   }
 
   async function callGemini(b64, key, model) {
-    const m = model || 'gemini-2.0-flash';
+    const m = model || 'gemini-2.5-flash';
     const url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
       encodeURIComponent(m) + ':generateContent';
     const res = await fetch(url, {
@@ -441,6 +546,17 @@ const Vision = (() => {
       return isFinite(f) && f >= 0 ? f : 0;
     };
     const basis = n(obj.basis) || 100;
+
+    /* Only keys the model actually returned go into the nutrient object.
+       An absent "of which saturates" line must stay absent, not become 0. */
+    const nut = {};
+    ['kcal', 'pro', 'car', 'fat', 'fib', 'sat', 'sug', 'salt'].forEach((k) => {
+      if (obj[k] === undefined || obj[k] === null || obj[k] === '') return;
+      const v = n(obj[k]);
+      if (isFinite(v)) nut[k] = v;
+    });
+    Nut.deriveSalt(nut);
+
     return {
       _reference: obj.reference ? String(obj.reference) : '',
       name: String(obj.name || '').trim(),
@@ -448,6 +564,7 @@ const Vision = (() => {
       barcode: '',
       basis,
       unit: obj.unit === 'ml' ? 'ml' : 'g',
+      n: nut,
       kcal: n(obj.kcal),
       pro: n(obj.pro),
       car: n(obj.car),

@@ -88,6 +88,11 @@
     <div class="scroll">
       <div class="rings" id="rings"></div>
 
+      <button class="full-link" id="open-full">
+        <span>Full nutrition — vitamins, minerals, everything</span>
+        <span class="full-link-go">›</span>
+      </button>
+
       <div class="slots" id="slots"></div>
 
       <div class="block">
@@ -335,6 +340,14 @@
         <label>Fat g<input type="number" id="r-fat" inputmode="decimal" step="0.1"></label>
         <label>Fiber g<input type="number" id="r-fib" inputmode="decimal" step="0.1"></label>
       </div>
+      <details class="more-nut" id="r-more">
+        <summary>More nutrients <span id="r-more-count"></span></summary>
+        <p class="more-hint">Per <span id="r-more-basis">100</span> of this ingredient. Leave a field
+          empty where the value is unknown — empty means "no data", which is not the same as zero and
+          is counted differently in the day's totals.</p>
+        <div id="r-more-fields"></div>
+      </details>
+
       <div class="photo-actions">
         <button class="btn" id="r-add-label">Attach label photo</button>
         <button class="btn" id="r-add-front">Attach product photo</button>
@@ -379,6 +392,18 @@
     </div>
   </div>
 
+  <!-- full nutrition panel -->
+  <div class="sheet" id="sheet-full" hidden>
+    <div class="sheet-head">
+      <h2 id="full-title">Full nutrition</h2>
+      <button class="icon-btn" data-close>✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="provenance" id="full-note"></div>
+      <div id="full-panel"></div>
+    </div>
+  </div>
+
   <!-- weight -->
   <div class="sheet" id="sheet-weight" hidden>
     <div class="sheet-head"><h2>Log body weight</h2><button class="icon-btn" data-close>✕</button></div>
@@ -395,6 +420,7 @@
 <div class="toast" id="toast" hidden></div>
 <div class="busy" id="busy" hidden><div class="spinner"></div><span id="busy-text">Working…</span></div>
 
+<script src="js/nutrients.js"></script>
 <script src="js/db.js"></script>
 <script src="js/calc.js"></script>
 <script src="js/vision.js"></script>
